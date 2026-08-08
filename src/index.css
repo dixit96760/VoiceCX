@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  
+  --color-primary-500: #2563EB;
+  --color-primary-600: #1D4ED8;
+  
+  --color-positive-500: #14B8A6;
+  --color-positive-bg: #ECFDF5;
+  
+  --color-negative-500: #EF4444;
+  --color-negative-bg: #FEF2F2;
+  
+  --color-warning-500: #F59E0B;
+  --color-warning-bg: #FFFBEB;
+  
+  --color-secondary-500: #8B5CF6;
+  --color-secondary-bg: #F5F3FF;
+  
+  --color-bg-page: #F8FAFC;
+  --color-bg-card: #FFFFFF;
+  
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748B;
+  --color-text-verymuted: #94A3B8;
+  
+  --color-border-subtle: #E2E8F0;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-page);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom scrollbar for a cleaner SaaS look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
