@@ -2,6 +2,16 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Setting = require('../models/Setting');
+const { getIsConnected } = require('../config/db');
+
+const DEMO_USER = {
+  _id: 'owner_demo_id_12345',
+  id: 'owner_demo_id_12345',
+  name: 'Chef Sarah Jenkins',
+  email: 'owner@y6bistro.com',
+  restaurantName: 'Y6 Gourmet Bistro',
+  phone: '+1 (555) 234-5678',
+};
 
 const generateToken = (id) => {
   const secret = process.env.JWT_SECRET || 'super_secret_jwt_restaurant_voice_agent_key_2026';
@@ -14,6 +24,16 @@ const generateToken = (id) => {
 const registerUser = async (req, res) => {
   try {
     const { name, email, password, restaurantName, phone } = req.body;
+    const isDb = getIsConnected();
+
+    if (!isDb) {
+      const token = generateToken(DEMO_USER._id);
+      return res.status(201).json({
+        success: true,
+        token,
+        user: { ...DEMO_USER, name: name || DEMO_USER.name, email: email || DEMO_USER.email, restaurantName: restaurantName || DEMO_USER.restaurantName },
+      });
+    }
 
     const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
@@ -66,6 +86,16 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const isDb = getIsConnected();
+
+    if (!isDb) {
+      const token = generateToken(DEMO_USER._id);
+      return res.json({
+        success: true,
+        token,
+        user: DEMO_USER,
+      });
+    }
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
@@ -101,16 +131,25 @@ const loginUser = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
+    const isDb = getIsConnected();
+
+    if (!isDb) {
+      return res.json({
+        success: true,
+        user: DEMO_USER,
+      });
+    }
+
     const user = await User.findById(req.user._id).select('-password');
     res.json({
       success: true,
       user: {
-        id: user._id,
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        restaurantName: user.restaurantName,
-        phone: user.phone,
+        id: user ? user._id : req.user._id,
+        _id: user ? user._id : req.user._id,
+        name: user ? user.name : 'Chef Sarah Jenkins',
+        email: user ? user.email : 'owner@y6bistro.com',
+        restaurantName: user ? user.restaurantName : 'Y6 Gourmet Bistro',
+        phone: user ? user.phone : '+1 (555) 234-5678',
       },
     });
   } catch (error) {

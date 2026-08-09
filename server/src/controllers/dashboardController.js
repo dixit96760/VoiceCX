@@ -1,14 +1,76 @@
 const Feedback = require('../models/Feedback');
+const { getIsConnected } = require('../config/db');
+
+const MEMORY_FEEDBACKS = [
+  {
+    _id: 'fb_1',
+    customerName: 'Michael Scott',
+    customerPhone: '+1 (555) 301-4455',
+    rating: 5,
+    sentiment: 'positive',
+    status: 'reviewed',
+    summary: 'Customer loved the ribeye steak and excellent table service.',
+    transcript: [
+      { speaker: 'Agent', text: 'Hi Michael! How was your dinner at Y6 Gourmet Bistro yesterday?' },
+      { speaker: 'Customer', text: 'It was fantastic! The ribeye steak was perfectly cooked and our server was amazing.' },
+    ],
+    categoryRatings: { food: 5, service: 5, ambience: 4, value: 4 },
+    audioUrl: 'https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg',
+    ownerNotes: 'Sent 10% discount voucher for next visit.',
+    praises: ['Ribeye steak quality', 'Attentive service'],
+    topIssues: [],
+    date: new Date(Date.now() - 86400000 * 2),
+  },
+  {
+    _id: 'fb_2',
+    customerName: 'Pam Beesly',
+    customerPhone: '+1 (555) 301-6677',
+    rating: 2,
+    sentiment: 'negative',
+    status: 'action_required',
+    summary: 'Soup was served cold and main course had a long 35-minute delay.',
+    transcript: [
+      { speaker: 'Agent', text: 'Hello Pam! Thank you for dining with us. We would love your quick feedback.' },
+      { speaker: 'Customer', text: 'Honestly, the soup was lukewarm and we waited 35 minutes for our main course.' },
+    ],
+    categoryRatings: { food: 2, service: 2, ambience: 4, value: 2 },
+    audioUrl: '',
+    ownerNotes: 'Need to follow up with head chef regarding kitchen timing.',
+    praises: [],
+    topIssues: ['Cold soup', 'Long wait time'],
+    date: new Date(Date.now() - 86400000 * 5),
+  },
+  {
+    _id: 'fb_3',
+    customerName: 'Jim Halpert',
+    customerPhone: '+1 (555) 301-8899',
+    rating: 5,
+    sentiment: 'positive',
+    status: 'pending',
+    summary: 'Delightful atmosphere and wonderful tiramisu dessert.',
+    transcript: [
+      { speaker: 'Agent', text: 'Hi Jim, how was your experience at Y6 Bistro?' },
+      { speaker: 'Customer', text: 'Great atmosphere and the tiramisu was incredible!' },
+    ],
+    categoryRatings: { food: 5, service: 5, ambience: 5, value: 5 },
+    audioUrl: '',
+    ownerNotes: '',
+    praises: ['Tiramisu dessert', 'Great atmosphere'],
+    topIssues: [],
+    date: new Date(Date.now() - 86400000 * 1),
+  },
+];
 
 // @desc    Get dashboard aggregated KPI metrics
 // @route   GET /api/dashboard
 // @access  Private
 const getDashboard = async (req, res) => {
   try {
+    const isDb = getIsConnected();
     const userId = req.user._id;
 
-    // Fetch all feedback items for this user
-    const feedbacks = await Feedback.find({ user: userId });
+    // Fetch all feedback items for this user or memory fallback
+    const feedbacks = isDb ? await Feedback.find({ user: userId }) : MEMORY_FEEDBACKS;
 
     const totalFeedback = feedbacks.length;
     
@@ -108,9 +170,10 @@ const getDashboard = async (req, res) => {
 // @access  Private
 const getInsights = async (req, res) => {
   try {
+    const isDb = getIsConnected();
     const userId = req.user._id;
 
-    const feedbacks = await Feedback.find({ user: userId }).sort({ date: 1, createdAt: 1 });
+    const feedbacks = isDb ? await Feedback.find({ user: userId }).sort({ date: 1, createdAt: 1 }) : MEMORY_FEEDBACKS;
     const total = feedbacks.length;
 
     const positive = feedbacks.filter((f) => f.sentiment === 'positive').length;

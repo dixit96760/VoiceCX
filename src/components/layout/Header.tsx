@@ -1,14 +1,16 @@
 import React from 'react';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, UserPlus } from 'lucide-react';
 import { Input } from '../ui/Input';
+import { Button } from '../ui/Button';
 
 interface HeaderProps {
   title: string;
   description?: string;
   showDateRange?: boolean;
+  onAddCustomerClick?: () => void;
 }
 
-export function Header({ title, description, showDateRange }: HeaderProps) {
+export function Header({ title, description, showDateRange, onAddCustomerClick }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-card)] px-6">
       <div className="flex flex-col">
@@ -17,6 +19,13 @@ export function Header({ title, description, showDateRange }: HeaderProps) {
       </div>
 
       <div className="flex items-center space-x-4">
+        {onAddCustomerClick && (
+          <Button size="sm" onClick={onAddCustomerClick} className="flex items-center space-x-1">
+            <UserPlus className="h-4 w-4 mr-1" />
+            <span>Add Customer</span>
+          </Button>
+        )}
+
         {showDateRange && (
           <select className="h-9 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-page)] px-3 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]">
             <option>Last 7 Days</option>

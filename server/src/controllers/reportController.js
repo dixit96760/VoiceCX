@@ -1,4 +1,36 @@
 const Feedback = require('../models/Feedback');
+const { getIsConnected } = require('../config/db');
+
+const MEMORY_FEEDBACKS = [
+  {
+    _id: 'fb_1',
+    customerName: 'Michael Scott',
+    customerPhone: '+1 (555) 301-4455',
+    rating: 5,
+    sentiment: 'positive',
+    status: 'reviewed',
+    summary: 'Customer loved the ribeye steak and excellent table service.',
+    categoryRatings: { food: 5, service: 5, ambience: 4, value: 4 },
+    ownerNotes: 'Sent 10% discount voucher for next visit.',
+    praises: ['Ribeye steak quality', 'Attentive service'],
+    topIssues: [],
+    date: new Date(Date.now() - 86400000 * 2),
+  },
+  {
+    _id: 'fb_2',
+    customerName: 'Pam Beesly',
+    customerPhone: '+1 (555) 301-6677',
+    rating: 2,
+    sentiment: 'negative',
+    status: 'action_required',
+    summary: 'Soup was served cold and main course had a long 35-minute delay.',
+    categoryRatings: { food: 2, service: 2, ambience: 4, value: 2 },
+    ownerNotes: 'Need to follow up with head chef regarding kitchen timing.',
+    praises: [],
+    topIssues: ['Cold soup', 'Long wait time'],
+    date: new Date(Date.now() - 86400000 * 5),
+  },
+];
 
 // Helper function to escape CSV values
 const escapeCsv = (val) => {
@@ -12,9 +44,10 @@ const escapeCsv = (val) => {
 // @access  Private
 const exportFeedbackCsv = async (req, res) => {
   try {
+    const isDb = getIsConnected();
     const userId = req.user._id;
 
-    const feedbacks = await Feedback.find({ user: userId }).sort({ date: -1 });
+    const feedbacks = isDb ? await Feedback.find({ user: userId }).sort({ date: -1 }) : MEMORY_FEEDBACKS;
 
     const headers = [
       'Feedback ID',
