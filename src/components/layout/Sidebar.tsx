@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Home, Phone, BarChart2, Users, FileText, Settings, LogOut, Mic, MessageSquare } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export function Sidebar() {
   const { user, logout } = useAuth();

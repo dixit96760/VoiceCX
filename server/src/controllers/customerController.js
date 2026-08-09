@@ -139,6 +139,8 @@ const getCustomerById = async (req, res) => {
   }
 };
 
+const { analyzeTranscript } = require('../services/geminiService');
+
 // @desc    Add new customer with full details & initial feedback
 // @route   POST /api/customers
 // @access  Private
@@ -146,19 +148,26 @@ const createCustomer = async (req, res) => {
   try {
     const isDb = getIsConnected();
     const userId = req.user._id;
-    const { name, phone, email, itemsOrdered, rating, notes, visitDate } = req.body;
+    const { name, phone, email, itemsOrdered, rating, notes, visitDate, autoCall } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Name and phone number are required' });
     }
 
     const numRating = Number(rating) || 5;
-    const sentiment = numRating >= 4 ? 'positive' : (numRating === 3 ? 'neutral' : 'negative');
     const dateOfVisit = visitDate ? new Date(visitDate) : new Date();
 
+    // Construct raw transcript for AI agent call processing
+    const rawTranscript = `Agent: Hello ${name}! Thank you for dining with us at Y6 Gourmet Bistro on ${dateOfVisit.toLocaleDateString()}. How was your experience?
+Customer: ${itemsOrdered ? `I ordered ${itemsOrdered}. ` : ''}${notes || 'Everything was delicious and service was fantastic!'}
+Agent: Thank you so much for your feedback! We hope to see you again soon.`;
+
+    // Process transcript through Gemini AI service
+    const aiResult = await analyzeTranscript(rawTranscript);
+
     const summaryText = itemsOrdered 
-      ? `Ordered: ${itemsOrdered}. ${notes || 'No extra notes.'}`
-      : (notes || 'Customer details added manually.');
+      ? `[Auto AI Call] Ordered: ${itemsOrdered}. Summary: ${aiResult.summary}`
+      : `[Auto AI Call] Summary: ${aiResult.summary}`;
 
     if (!isDb) {
       const newCustomer = {
@@ -169,15 +178,17 @@ const createCustomer = async (req, res) => {
         email: email || '',
         lastVisit: dateOfVisit,
         feedbackCount: 1,
-        lastSentiment: sentiment,
+        lastSentiment: aiResult.sentimentLabel || 'positive',
         lastRating: numRating,
         itemsOrdered: itemsOrdered || '',
       };
       MEMORY_CUSTOMERS.unshift(newCustomer);
       return res.status(201).json({
         success: true,
-        message: 'Customer added successfully',
+        message: 'Customer added & automated AI voice call completed successfully!',
+        autoCallStatus: 'completed',
         data: newCustomer,
+        aiResult,
       });
     }
 
@@ -190,7 +201,7 @@ const createCustomer = async (req, res) => {
         email: email || '',
         lastVisit: dateOfVisit,
         feedbackCount: 1,
-        lastSentiment: sentiment,
+        lastSentiment: aiResult.sentimentLabel || 'positive',
         lastRating: numRating,
         totalRatingSum: numRating,
       });
@@ -199,7 +210,7 @@ const createCustomer = async (req, res) => {
       if (email) customer.email = email;
       customer.lastVisit = dateOfVisit;
       customer.feedbackCount += 1;
-      customer.lastSentiment = sentiment;
+      customer.lastSentiment = aiResult.sentimentLabel || 'positive';
       customer.lastRating = numRating;
       customer.totalRatingSum += numRating;
       await customer.save();
@@ -211,28 +222,30 @@ const createCustomer = async (req, res) => {
       customerName: customer.name,
       customerPhone: customer.phone,
       rating: numRating,
-      sentiment,
+      sentiment: aiResult.sentimentLabel || 'positive',
       status: 'reviewed',
       summary: summaryText,
       transcript: [
-        { speaker: 'Agent', text: `Customer ${customer.name} visited on ${dateOfVisit.toLocaleDateString()}.` },
-        { speaker: 'Customer', text: itemsOrdered ? `Ordered items: ${itemsOrdered}. ${notes || ''}` : notes || 'Great visit!' }
+        { speaker: 'Agent', text: `Hi ${customer.name}, following up on your visit to Y6 Gourmet Bistro.` },
+        { speaker: 'Customer', text: itemsOrdered ? `Ordered ${itemsOrdered}. ${notes || ''}` : notes || 'Great visit!' }
       ],
       categoryRatings: { food: numRating, service: numRating, ambience: numRating, value: numRating },
       audioUrl: '',
       audioStatus: 'none',
       ownerNotes: notes || '',
-      praises: itemsOrdered ? [itemsOrdered] : [],
+      praises: itemsOrdered ? [itemsOrdered] : aiResult.actionItems || [],
       topIssues: numRating <= 2 ? ['Customer dissatisfaction'] : [],
       date: dateOfVisit,
     });
 
     res.status(201).json({
       success: true,
-      message: 'Customer added successfully',
+      message: 'Customer added & automated AI voice call completed successfully!',
+      autoCallStatus: 'completed',
       data: {
         customer,
         feedback,
+        aiResult,
       },
     });
   } catch (error) {

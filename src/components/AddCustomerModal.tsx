@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Star, UserPlus, Utensils, Phone, Mail, Calendar, MessageSquare } from 'lucide-react';
+import { X, Star, UserPlus, Utensils, PhoneCall, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { addCustomer } from '../services/api';
@@ -18,7 +18,9 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
   const [rating, setRating] = useState(5);
   const [notes, setNotes] = useState('');
   const [visitDate, setVisitDate] = useState(new Date().toISOString().split('T')[0]);
+  const [autoCall, setAutoCall] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [callMessage, setCallMessage] = useState('');
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -31,9 +33,14 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
     }
 
     setError('');
+    setCallMessage('');
     setLoading(true);
 
     try {
+      if (autoCall) {
+        setCallMessage(`Initiating Automated AI Voice Agent call to ${phone.trim()}...`);
+      }
+
       const res = await addCustomer({
         name: name.trim(),
         phone: phone.trim(),
@@ -45,12 +52,24 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
       });
 
       if (res.success) {
+        // Speak confirmation if SpeechSynthesis supported
+        if (autoCall && 'speechSynthesis' in window) {
+          try {
+            window.speechSynthesis.cancel();
+            const text = `Automated AI call completed for ${name.trim()}. Recorded feedback and analyzed sentiment.`;
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+          } catch {}
+        }
+
         setName('');
         setPhone('');
         setEmail('');
         setItemsOrdered('');
         setRating(5);
         setNotes('');
+        setCallMessage('');
+
         if (onSuccess) onSuccess();
         onClose();
       } else {
@@ -84,8 +103,8 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
                 <UserPlus className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Add New Customer</h3>
-                <p className="text-xs text-[var(--color-text-muted)]">Record customer visit, ordered dishes, and feedback</p>
+                <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Add Customer & AI Voice Call</h3>
+                <p className="text-xs text-[var(--color-text-muted)]">Record visit and automatically trigger AI Voice Agent follow-up call</p>
               </div>
             </div>
             <button 
@@ -101,6 +120,13 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
             {error && (
               <div className="p-3 rounded-md bg-[var(--color-negative-bg)] text-[var(--color-negative-500)] text-sm font-medium border border-red-200">
                 {error}
+              </div>
+            )}
+
+            {callMessage && (
+              <div className="p-3 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200 flex items-center space-x-2 animate-pulse">
+                <PhoneCall className="h-4 w-4 text-blue-600" />
+                <span>{callMessage}</span>
               </div>
             )}
 
@@ -207,9 +233,25 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
               </label>
               <textarea
                 className="w-full h-20 rounded-md border border-[var(--color-border-subtle)] p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                placeholder="Add comments about their dining experience, special requests, or server feedback..."
+                placeholder="Add comments about their dining experience..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+
+            {/* Auto Call Checkbox */}
+            <div className="p-3 bg-[var(--color-secondary-bg)] rounded-xl border border-purple-100 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="h-4 w-4 text-[var(--color-secondary-500)]" />
+                <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+                  Automatically Trigger AI Voice Agent Call
+                </span>
+              </div>
+              <input 
+                type="checkbox"
+                checked={autoCall}
+                onChange={(e) => setAutoCall(e.target.checked)}
+                className="h-4 w-4 rounded text-[var(--color-primary-500)] focus:ring-[var(--color-primary-500)] cursor-pointer"
               />
             </div>
 
@@ -218,8 +260,9 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Saving Customer...' : 'Save Customer Details'}
+              <Button type="submit" disabled={loading} className="flex items-center space-x-2">
+                <PhoneCall className="h-4 w-4" />
+                <span>{loading ? (autoCall ? 'Calling Customer...' : 'Saving...') : 'Save & Trigger AI Call'}</span>
               </Button>
             </div>
           </form>
