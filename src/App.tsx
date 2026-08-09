@@ -9,6 +9,7 @@ import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
+import VoiceAgent from './components/VoiceAgent';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -49,6 +50,7 @@ function App() {
             <Route path="customers" element={<Customers />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="/voice-agent" element={<VoiceAgent />} />
           </Route>
         </Routes>
       </BrowserRouter>
