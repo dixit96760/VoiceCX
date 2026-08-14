@@ -14,6 +14,8 @@ router.post('/webhooks/vapi', callController.handleVapiWebhook);
 router.post('/vapi/webhook', callController.handleVapiWebhook);
 router.post('/webhooks/twilio/status', callController.handleTwilioStatusWebhook);
 router.post('/webhooks/twilio/voice', callController.handleTwilioVoiceWebhook);
+router.post('/webhooks/twilio/gather', callController.handleTwilioGatherWebhook);
+router.get('/webhooks/twilio/gather', callController.handleTwilioGatherWebhook);
 
 // Legacy routes compatibility
 router.get('/analytics', callController.getDashboardStats);

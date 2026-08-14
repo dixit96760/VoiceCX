@@ -8,7 +8,7 @@ dotenv.config();
 
 const { connectDB } = require('./config/db');
 const { demoMode, twilioConfigured, geminiConfigured } = require('./config/appConfig');
-const { handleVapiWebhook, handleTwilioStatusWebhook, handleTwilioVoiceWebhook } = require('./controllers/callController');
+const { handleVapiWebhook, handleTwilioStatusWebhook, handleTwilioVoiceWebhook, handleTwilioGatherWebhook } = require('./controllers/callController');
 
 const app = express();
 
@@ -24,6 +24,8 @@ app.use(express.urlencoded({ extended: true }));
 app.post('/api/webhooks/vapi', handleVapiWebhook);
 app.post('/api/webhooks/twilio/status', handleTwilioStatusWebhook);
 app.post('/api/webhooks/twilio/voice', handleTwilioVoiceWebhook);
+app.post('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
+app.get('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
 
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));

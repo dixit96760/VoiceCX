@@ -5,6 +5,8 @@ const { getIsConnected } = require('../config/db');
 const { getVoiceProvider } = require('../services/voiceProvider');
 const { processVapiWebhook } = require('../services/webhookService');
 const { analyzeTranscript } = require('../services/geminiService');
+const { buildGreetingTwiML, buildReplyTwiML, buildTranscriptFromHistory } = require('../services/twimlService');
+const { generateCallSummary } = require('../services/aiSummaryService');
 
 /**
  * Validate E.164 phone number format (e.g. +919876543210, +14155552671)
@@ -313,6 +315,121 @@ exports.handleTwilioStatusWebhook = async (req, res) => {
   }
 };
 
+// @desc  Voice Webhook — Twilio calls this when recipient picks up
+// @route POST /api/webhooks/twilio/voice
+exports.handleTwilioVoiceWebhook = async (req, res) => {
+  try {
+    const callSid = req.body.CallSid || '';
+    const to = req.body.To || '';
+    const isDb = getIsConnected();
+    const baseUrl = (process.env.PUBLIC_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
+
+    // Find the call record to get contact name, purpose, instructions
+    let contactName = 'there';
+    let purpose = 'follow up';
+    let customInstructions = '';
+
+    if (isDb && callSid) {
+      const callDoc = await Call.findOne({
+        $or: [{ twilioCallSid: callSid }, { phoneNumber: to }],
+      }).sort({ createdAt: -1 });
+
+      if (callDoc) {
+        contactName = callDoc.contactName || 'there';
+        purpose = callDoc.purpose || 'follow up';
+        customInstructions = callDoc.customInstructions || '';
+        // Mark as in-progress
+        callDoc.status = 'in-progress';
+        callDoc.startedAt = callDoc.startedAt || new Date();
+        callDoc.twilioCallSid = callSid;
+        await callDoc.save();
+      }
+    }
+
+    console.log(`[VoiceWebhook] Call ${callSid} answered by ${to} — Contact: ${contactName}, Purpose: ${purpose}`);
+
+    const twiml = await buildGreetingTwiML(callSid, contactName, purpose, customInstructions, baseUrl);
+
+    res.set('Content-Type', 'text/xml');
+    res.send(twiml);
+  } catch (error) {
+    console.error('[handleTwilioVoiceWebhook Error]', error);
+    // Fallback TwiML so Twilio never shows "application error"
+    res.set('Content-Type', 'text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Aditi" language="en-IN">Hello! Thank you for picking up. We will call you back shortly. Goodbye!</Say>
+  <Hangup/>
+</Response>`);
+  }
+};
+
+// @desc  Gather Webhook — Processes speech input and generates AI reply
+// @route POST /api/webhooks/twilio/gather
+exports.handleTwilioGatherWebhook = async (req, res) => {
+  try {
+    const callerSpeech = req.body.SpeechResult || req.query.SpeechResult || '';
+    const callSid = req.query.callSid || req.body.CallSid || '';
+    const contactName = req.query.contactName || '';
+    const purpose = req.query.purpose || '';
+    const customInstructions = req.query.customInstructions || '';
+    const turn = parseInt(req.query.turn || '1', 10);
+    const historyEncoded = req.query.history || '';
+    const baseUrl = (process.env.PUBLIC_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
+    const isDb = getIsConnected();
+
+    console.log(`[GatherWebhook] Turn ${turn} | CallSid: ${callSid} | Speech: "${callerSpeech}"`);
+
+    const { twiml, history, ended } = await buildReplyTwiML(
+      callerSpeech, callSid, contactName, purpose, customInstructions, turn, historyEncoded, baseUrl
+    );
+
+    // If call ended, save transcript and generate AI summary
+    if (ended && isDb && callSid) {
+      try {
+        const callDoc = await Call.findOne({
+          $or: [{ twilioCallSid: callSid }, { vapiCallId: callSid }],
+        });
+
+        if (callDoc) {
+          const transcriptText = buildTranscriptFromHistory(history);
+          callDoc.transcript = transcriptText;
+          callDoc.status = 'completed';
+          callDoc.endedAt = new Date();
+          await callDoc.save();
+
+          // Async AI summary — don't await so call ends fast
+          generateCallSummary(transcriptText, { purpose, contactName })
+            .then(async (summary) => {
+              callDoc.summary = summary.summary;
+              callDoc.outcome = summary.outcome;
+              callDoc.sentiment = summary.sentiment;
+              callDoc.nextAction = summary.nextAction;
+              callDoc.followUpRequired = summary.followUpRequired;
+              callDoc.followUpReason = summary.followUpReason;
+              await callDoc.save();
+              console.log(`[GatherWebhook] AI summary saved for call ${callSid}`);
+            })
+            .catch(err => console.warn('[GatherWebhook] Summary error:', err.message));
+        }
+      } catch (dbErr) {
+        console.warn('[GatherWebhook] DB save error:', dbErr.message);
+      }
+    }
+
+    res.set('Content-Type', 'text/xml');
+    res.send(twiml);
+  } catch (error) {
+    console.error('[handleTwilioGatherWebhook Error]', error);
+    res.set('Content-Type', 'text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Aditi" language="en-IN">Thank you for your time. Have a great day. Goodbye!</Say>
+  <Hangup/>
+</Response>`);
+  }
+};
+
 // Existing compatibility exports for legacy simulation endpoints
 exports.getCallLogs = async (req, res) => {
   try {
@@ -336,5 +453,4 @@ exports.toggleResolveActionItem = async (req, res) => {
   res.json({ success: true });
 };
 
-exports.handleTwilioVoiceWebhook = exports.handleVapiWebhook;
 exports.makeRealTwilioCall = exports.createCall;
