@@ -6,8 +6,7 @@ const twilioConfigured = !demoMode &&
   process.env.TWILIO_PHONE_NUMBER;
 
 const geminiConfigured = !demoMode &&
-  process.env.GEMINI_API_KEY &&
-  process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here';
+  !!process.env.GEMINI_API_KEY;
 
 module.exports = {
   demoMode,

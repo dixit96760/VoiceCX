@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { Layout } from './components/layout/Layout';
 import { Home } from './pages/Home';
+import { CallHistory } from './pages/CallHistory';
 import { FeedbackPage } from './pages/Feedback';
 import { Insights } from './pages/Insights';
 import { Customers } from './pages/Customers';
@@ -46,12 +47,13 @@ function App() {
             }
           >
             <Route index element={<Home />} />
+            <Route path="calls" element={<CallHistory />} />
             <Route path="feedback" element={<FeedbackPage />} />
             <Route path="insights" element={<Insights />} />
             <Route path="customers" element={<Customers />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="/voice-agent" element={<VoiceAgent />} />
+            <Route path="voice-agent" element={<VoiceAgent />} />
           </Route>
         </Routes>
       </BrowserRouter>

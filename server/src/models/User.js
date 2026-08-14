@@ -27,6 +27,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '+1 (555) 234-5678',
     },
+    otpCode: {
+      type: String,
+      default: null,
+    },
+    otpExpiresAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

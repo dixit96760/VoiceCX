@@ -21,9 +21,9 @@ export interface Feedback {
 }
 
 export interface TranscriptMessage {
-  speaker: 'Agent' | 'Customer';
+  speaker: 'Agent' | 'Customer' | 'AI';
   text: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface Customer {
@@ -62,4 +62,37 @@ export interface RankedIssue {
   issue: string;
   percentage: number;
   count: number;
+}
+
+export interface CallRecord {
+  id: string;
+  _id?: string;
+  vapiCallId?: string;
+  contactName: string;
+  phoneNumber: string;
+  purpose: string;
+  customInstructions?: string;
+  status: 'queued' | 'calling' | 'in-progress' | 'completed' | 'failed';
+  startedAt?: string;
+  endedAt?: string;
+  duration: number;
+  transcript?: any;
+  summary?: string;
+  outcome?: 'positive' | 'negative' | 'interested' | 'not_interested' | 'callback_requested' | 'completed' | 'unknown';
+  sentiment?: 'positive' | 'neutral' | 'negative';
+  nextAction?: string;
+  followUpRequired?: boolean;
+  followUpReason?: string;
+  recordingUrl?: string;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CallStats {
+  totalCalls: number;
+  completed: number;
+  failed: number;
+  inProgress: number;
+  averageDuration: number;
 }

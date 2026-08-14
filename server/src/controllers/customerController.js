@@ -2,11 +2,7 @@ const Customer = require('../models/Customer');
 const Feedback = require('../models/Feedback');
 const { getIsConnected } = require('../config/db');
 
-const MEMORY_CUSTOMERS = [
-  { _id: 'c1', id: 'c1', name: 'Michael Scott', phone: '+1 (555) 301-4455', lastVisit: new Date(Date.now() - 86400000 * 2), feedbackCount: 2, lastSentiment: 'positive', lastRating: 5 },
-  { _id: 'c2', id: 'c2', name: 'Pam Beesly', phone: '+1 (555) 301-6677', lastVisit: new Date(Date.now() - 86400000 * 5), feedbackCount: 1, lastSentiment: 'negative', lastRating: 2 },
-  { _id: 'c3', id: 'c3', name: 'Jim Halpert', phone: '+1 (555) 301-8899', lastVisit: new Date(Date.now() - 86400000 * 1), feedbackCount: 1, lastSentiment: 'positive', lastRating: 5 },
-];
+const MEMORY_CUSTOMERS = [];
 
 // @desc    Get customer profiles
 // @route   GET /api/customers
@@ -140,6 +136,8 @@ const getCustomerById = async (req, res) => {
 };
 
 const { analyzeTranscript } = require('../services/geminiService');
+const { makeOutboundCall } = require('../services/twilioService');
+const { twilioConfigured } = require('../config/appConfig');
 
 // @desc    Add new customer with full details & initial feedback
 // @route   POST /api/customers
@@ -156,6 +154,24 @@ const createCustomer = async (req, res) => {
 
     const numRating = Number(rating) || 5;
     const dateOfVisit = visitDate ? new Date(visitDate) : new Date();
+
+    // If Twilio is configured, place real phone call to customer's mobile phone!
+    let realCallInfo = null;
+    if (twilioConfigured) {
+      try {
+        const host = req.get('host');
+        const protocol = req.protocol;
+        const callbackUrl = `${protocol}://${host}/api/calls/twilio/webhook`;
+        realCallInfo = await makeOutboundCall({
+          toPhoneNumber: phone,
+          customerName: name,
+          callbackUrl,
+        });
+        console.log(`[Twilio Real Call] Placed outbound phone call to ${phone}, SID: ${realCallInfo.sid}`);
+      } catch (twilioErr) {
+        console.warn(`[Twilio Call Warning] Could not place real call (${twilioErr.message})`);
+      }
+    }
 
     // Construct raw transcript for AI agent call processing
     const rawTranscript = `Agent: Hello ${name}! Thank you for dining with us at Y6 Gourmet Bistro on ${dateOfVisit.toLocaleDateString()}. How was your experience?

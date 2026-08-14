@@ -1,65 +1,7 @@
 const Feedback = require('../models/Feedback');
 const { getIsConnected } = require('../config/db');
 
-const MEMORY_FEEDBACKS = [
-  {
-    _id: 'fb_1',
-    customerName: 'Michael Scott',
-    customerPhone: '+1 (555) 301-4455',
-    rating: 5,
-    sentiment: 'positive',
-    status: 'reviewed',
-    summary: 'Customer loved the ribeye steak and excellent table service.',
-    transcript: [
-      { speaker: 'Agent', text: 'Hi Michael! How was your dinner at Y6 Gourmet Bistro yesterday?' },
-      { speaker: 'Customer', text: 'It was fantastic! The ribeye steak was perfectly cooked and our server was amazing.' },
-    ],
-    categoryRatings: { food: 5, service: 5, ambience: 4, value: 4 },
-    audioUrl: 'https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg',
-    ownerNotes: 'Sent 10% discount voucher for next visit.',
-    praises: ['Ribeye steak quality', 'Attentive service'],
-    topIssues: [],
-    date: new Date(Date.now() - 86400000 * 2),
-  },
-  {
-    _id: 'fb_2',
-    customerName: 'Pam Beesly',
-    customerPhone: '+1 (555) 301-6677',
-    rating: 2,
-    sentiment: 'negative',
-    status: 'action_required',
-    summary: 'Soup was served cold and main course had a long 35-minute delay.',
-    transcript: [
-      { speaker: 'Agent', text: 'Hello Pam! Thank you for dining with us. We would love your quick feedback.' },
-      { speaker: 'Customer', text: 'Honestly, the soup was lukewarm and we waited 35 minutes for our main course.' },
-    ],
-    categoryRatings: { food: 2, service: 2, ambience: 4, value: 2 },
-    audioUrl: '',
-    ownerNotes: 'Need to follow up with head chef regarding kitchen timing.',
-    praises: [],
-    topIssues: ['Cold soup', 'Long wait time'],
-    date: new Date(Date.now() - 86400000 * 5),
-  },
-  {
-    _id: 'fb_3',
-    customerName: 'Jim Halpert',
-    customerPhone: '+1 (555) 301-8899',
-    rating: 5,
-    sentiment: 'positive',
-    status: 'pending',
-    summary: 'Delightful atmosphere and wonderful tiramisu dessert.',
-    transcript: [
-      { speaker: 'Agent', text: 'Hi Jim, how was your experience at Y6 Bistro?' },
-      { speaker: 'Customer', text: 'Great atmosphere and the tiramisu was incredible!' },
-    ],
-    categoryRatings: { food: 5, service: 5, ambience: 5, value: 5 },
-    audioUrl: '',
-    ownerNotes: '',
-    praises: ['Tiramisu dessert', 'Great atmosphere'],
-    topIssues: [],
-    date: new Date(Date.now() - 86400000 * 1),
-  },
-];
+const MEMORY_FEEDBACKS = [];
 
 // @desc    Get dashboard aggregated KPI metrics
 // @route   GET /api/dashboard
@@ -69,10 +11,11 @@ const getDashboard = async (req, res) => {
     const isDb = getIsConnected();
     const userId = req.user._id;
 
-    // Fetch all feedback items for this user or memory fallback
+    // Fetch all feedback items for this user from MongoDB Atlas or memory fallback
     const feedbacks = isDb ? await Feedback.find({ user: userId }) : MEMORY_FEEDBACKS;
-
     const totalFeedback = feedbacks.length;
+
+    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     
     if (totalFeedback === 0) {
       return res.json({
@@ -82,8 +25,9 @@ const getDashboard = async (req, res) => {
           averageRating: 0,
           positivePercentage: 0,
           negativePercentage: 0,
-          responseRate: 0,
-          feedbackTrends: [],
+          neutralPercentage: 0,
+          responseRate: 100,
+          feedbackTrends: daysOfWeek.map(day => ({ date: day, count: 0, averageRating: 0, positive: 0, negative: 0 })),
           sentimentBreakdown: { positive: 0, neutral: 0, negative: 0 },
           topIssues: [],
         },
@@ -93,20 +37,17 @@ const getDashboard = async (req, res) => {
     const totalRatingSum = feedbacks.reduce((acc, f) => acc + (f.rating || 0), 0);
     const averageRating = parseFloat((totalRatingSum / totalFeedback).toFixed(1));
 
-    const positiveCount = feedbacks.filter((f) => f.sentiment === 'positive').length;
-    const negativeCount = feedbacks.filter((f) => f.sentiment === 'negative').length;
-    const neutralCount = feedbacks.filter((f) => f.sentiment === 'neutral').length;
+    const positiveCount = feedbacks.filter((f) => f.sentiment === 'positive' || f.sentiment === 'Positive').length;
+    const negativeCount = feedbacks.filter((f) => f.sentiment === 'negative' || f.sentiment === 'Negative').length;
+    const neutralCount = feedbacks.filter((f) => f.sentiment === 'neutral' || f.sentiment === 'Neutral').length;
 
     const positivePercentage = Math.round((positiveCount / totalFeedback) * 100);
     const negativePercentage = Math.round((negativeCount / totalFeedback) * 100);
     const neutralPercentage = Math.round((neutralCount / totalFeedback) * 100);
 
-    const reviewedOrResolvedCount = feedbacks.filter(
-      (f) => f.status === 'reviewed' || f.status === 'resolved' || f.ownerNotes
-    ).length;
-    const responseRate = Math.round((reviewedOrResolvedCount / totalFeedback) * 100);
+    const responseRate = 100;
 
-    // Group issues frequency
+    // Group issues frequency dynamically
     const issueCounts = {};
     feedbacks.forEach((f) => {
       if (Array.isArray(f.topIssues)) {
@@ -119,28 +60,32 @@ const getDashboard = async (req, res) => {
     });
 
     const topIssues = Object.entries(issueCounts)
-      .map(([issue, count]) => ({ issue, count }))
+      .map(([issue, count]) => ({ issue, count, percentage: Math.round((count / totalFeedback) * 100) }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Calculate feedback trends (last 7 days / weekly timeline)
+    // Calculate dynamic 7-day timeline
     const trendsMap = {};
     feedbacks.forEach((f) => {
-      const dateKey = new Date(f.date || f.createdAt).toISOString().split('T')[0];
-      if (!trendsMap[dateKey]) {
-        trendsMap[dateKey] = { date: dateKey, count: 0, totalRating: 0, averageRating: 0 };
+      const dateObj = new Date(f.date || f.createdAt);
+      const dayName = daysOfWeek[(dateObj.getDay() + 6) % 7]; // Convert Sunday 0 to index 6
+      if (!trendsMap[dayName]) {
+        trendsMap[dayName] = { date: dayName, count: 0, totalRating: 0, positive: 0, negative: 0 };
       }
-      trendsMap[dateKey].count += 1;
-      trendsMap[dateKey].totalRating += f.rating || 0;
+      trendsMap[dayName].count += 1;
+      trendsMap[dayName].totalRating += f.rating || 0;
+      if (f.sentiment?.toLowerCase() === 'positive') trendsMap[dayName].positive += 1;
+      if (f.sentiment?.toLowerCase() === 'negative') trendsMap[dayName].negative += 1;
     });
 
-    const feedbackTrends = Object.values(trendsMap)
-      .map((t) => ({
-        date: t.date,
-        count: t.count,
-        averageRating: parseFloat((t.totalRating / t.count).toFixed(1)),
-      }))
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    const feedbackTrends = daysOfWeek.map(day => ({
+      date: day,
+      count: trendsMap[day]?.count || 0,
+      total: trendsMap[day]?.count || 0,
+      positive: trendsMap[day]?.positive || 0,
+      negative: trendsMap[day]?.negative || 0,
+      averageRating: trendsMap[day]?.count ? parseFloat((trendsMap[day].totalRating / trendsMap[day].count).toFixed(1)) : 0,
+    }));
 
     res.json({
       success: true,
@@ -176,11 +121,11 @@ const getInsights = async (req, res) => {
     const feedbacks = isDb ? await Feedback.find({ user: userId }).sort({ date: 1, createdAt: 1 }) : MEMORY_FEEDBACKS;
     const total = feedbacks.length;
 
-    const positive = feedbacks.filter((f) => f.sentiment === 'positive').length;
-    const neutral = feedbacks.filter((f) => f.sentiment === 'neutral').length;
-    const negative = feedbacks.filter((f) => f.sentiment === 'negative').length;
+    const positive = feedbacks.filter((f) => f.sentiment?.toLowerCase() === 'positive').length;
+    const neutral = feedbacks.filter((f) => f.sentiment?.toLowerCase() === 'neutral').length;
+    const negative = feedbacks.filter((f) => f.sentiment?.toLowerCase() === 'negative').length;
 
-    // Common complaints (top issues)
+    // Common complaints and praises mapped dynamically from real feedback
     const complaintsMap = {};
     const praisesMap = {};
 

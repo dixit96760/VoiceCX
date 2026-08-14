@@ -1,0 +1,150 @@
+const Call = require('../models/Call');
+const CustomerCallLog = require('../models/CustomerCallLog');
+const { getIsConnected } = require('../config/db');
+const { getVoiceProvider } = require('./voiceProvider');
+const { generateCallSummary } = require('./aiSummaryService');
+
+// In-memory set for tracking processed webhook events (idempotency fallback)
+const processedEvents = new Set();
+const processedCompletedCalls = new Set();
+
+/**
+ * Idempotent Webhook Processor for Vapi / Telephony Provider events
+ * @param {Object} payload - Raw webhook request body
+ * @param {Object} [headers] - Request headers for signature validation
+ */
+async function processVapiWebhook(payload, headers) {
+  try {
+    const voiceProvider = getVoiceProvider();
+    const parsed = await voiceProvider.handleWebhook(payload, headers);
+
+    const { vapiCallId, status, transcript, recordingUrl, duration, eventType } = parsed;
+
+    if (!vapiCallId) {
+      console.warn('[webhookService] Received webhook payload without vapiCallId:', payload);
+      return { success: false, message: 'Missing vapiCallId' };
+    }
+
+    // Idempotency Key Check
+    const idempotencyKey = `${vapiCallId}:${eventType}:${status}:${(transcript || '').length}`;
+    if (processedEvents.has(idempotencyKey)) {
+      console.log(`[webhookService Idempotency] Skipping duplicate webhook event: ${idempotencyKey}`);
+      return { success: true, message: 'Duplicate event skipped' };
+    }
+    processedEvents.add(idempotencyKey);
+
+    // Keep memory set bounded
+    if (processedEvents.size > 5000) {
+      const firstItem = processedEvents.values().next().value;
+      processedEvents.delete(firstItem);
+    }
+
+    const isDb = getIsConnected();
+
+    if (isDb) {
+      let callDoc = await Call.findOne({
+        $or: [{ vapiCallId }, { twilioCallSid: vapiCallId }],
+      });
+      
+      if (!callDoc) {
+        callDoc = await Call.findOne({ status: { $in: ['queued', 'calling', 'in-progress'] } }).sort({ createdAt: -1 });
+        if (callDoc) {
+          if (!callDoc.vapiCallId) callDoc.vapiCallId = vapiCallId;
+          if (!callDoc.twilioCallSid) callDoc.twilioCallSid = vapiCallId;
+        }
+      }
+
+      if (!callDoc) {
+        console.warn(`[webhookService] Call record not found for ID: ${vapiCallId}. Creating fallback call entry.`);
+        callDoc = new Call({
+          vapiCallId,
+          twilioCallSid: vapiCallId,
+          contactName: payload.message?.call?.customer?.name || payload.CallerName || 'Valued Customer',
+          phoneNumber: payload.message?.call?.customer?.number || payload.From || payload.To || '+15550000000',
+          purpose: 'Outbound AI Call',
+          status: 'queued',
+        });
+      }
+
+      // Update call status & timestamps
+      if (status && status !== callDoc.status) {
+        callDoc.status = status;
+        if (status === 'calling' && !callDoc.startedAt) {
+          callDoc.startedAt = new Date();
+        } else if (status === 'in-progress' && !callDoc.startedAt) {
+          callDoc.startedAt = new Date();
+        } else if (status === 'completed' || status === 'failed') {
+          callDoc.endedAt = new Date();
+          if (!callDoc.startedAt) callDoc.startedAt = new Date(Date.now() - (duration || 30) * 1000);
+        }
+      }
+
+      if (duration && duration > 0) {
+        callDoc.duration = duration;
+      }
+
+      if (recordingUrl) {
+        callDoc.recordingUrl = recordingUrl;
+      }
+
+      if (transcript && transcript.length > (callDoc.transcript ? JSON.stringify(callDoc.transcript).length : 0)) {
+        callDoc.transcript = transcript;
+      }
+
+      await callDoc.save();
+
+      // If call is completed and has not generated summary yet, generate AI summary
+      if ((status === 'completed' || transcript) && !processedCompletedCalls.has(vapiCallId)) {
+        processedCompletedCalls.add(vapiCallId);
+
+        const summaryResult = await generateCallSummary(callDoc.transcript || transcript, {
+          purpose: callDoc.purpose,
+          contactName: callDoc.contactName,
+        });
+
+        callDoc.summary = summaryResult.summary;
+        callDoc.outcome = summaryResult.outcome;
+        callDoc.sentiment = summaryResult.sentiment;
+        callDoc.nextAction = summaryResult.nextAction;
+        callDoc.followUpRequired = summaryResult.followUpRequired;
+        callDoc.followUpReason = summaryResult.followUpReason;
+        callDoc.status = 'completed';
+        if (!callDoc.endedAt) callDoc.endedAt = new Date();
+
+        await callDoc.save();
+
+        // Also create/sync entry in CustomerCallLog for full backwards compatibility
+        try {
+          await CustomerCallLog.create({
+            ownerId: callDoc.ownerId,
+            customerName: callDoc.contactName,
+            customerPhone: callDoc.phoneNumber,
+            callStatus: 'completed',
+            durationSeconds: callDoc.duration || 45,
+            rawTranscript: typeof callDoc.transcript === 'string' ? callDoc.transcript : JSON.stringify(callDoc.transcript),
+            sentimentScore: summaryResult.sentiment === 'positive' ? 85 : (summaryResult.sentiment === 'negative' ? 30 : 60),
+            sentimentLabel: summaryResult.sentiment,
+            feedbackCategory: 'General',
+            summary: summaryResult.summary,
+            actionItems: summaryResult.nextAction ? [summaryResult.nextAction] : [],
+            resolved: false,
+          });
+        } catch (err) {
+          console.warn('[webhookService] CustomerCallLog sync notice:', err.message);
+        }
+      }
+
+      return { success: true, callId: callDoc._id, status: callDoc.status };
+    } else {
+      console.log(`[webhookService Memory Mode] Received webhook for ${vapiCallId}, status: ${status}`);
+      return { success: true, vapiCallId, status };
+    }
+  } catch (error) {
+    console.error('[webhookService Error]', error);
+    return { success: false, error: error.message };
+  }
+}
+
+module.exports = {
+  processVapiWebhook,
+};

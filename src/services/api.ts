@@ -1,4 +1,4 @@
-import type { Feedback, Customer, DashboardMetrics, ChartDataPoint, RankedIssue } from '../types';
+import type { Feedback, Customer, DashboardMetrics, ChartDataPoint, RankedIssue, CallRecord, CallStats } from '../types';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -28,92 +28,48 @@ const DEMO_USER = {
 };
 
 // In-memory data store fallbacks for zero-error client execution
-let MEMORY_CUSTOMERS: Customer[] = [
-  { id: 'c1', name: 'Michael Scott', phone: '+1 (555) 301-4455', lastVisit: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0], feedbackCount: 2, lastSentiment: 'Positive', lastRating: 5 },
-  { id: 'c2', name: 'Pam Beesly', phone: '+1 (555) 301-6677', lastVisit: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0], feedbackCount: 1, lastSentiment: 'Negative', lastRating: 2 },
-  { id: 'c3', name: 'Jim Halpert', phone: '+1 (555) 301-8899', lastVisit: new Date(Date.now() - 86400000 * 1).toISOString().split('T')[0], feedbackCount: 1, lastSentiment: 'Positive', lastRating: 5 },
-];
+let MEMORY_CUSTOMERS: Customer[] = [];
+let MEMORY_FEEDBACK: Feedback[] = [];
+let MEMORY_DNC: string[] = [];
+let MEMORY_CALLS: CallRecord[] = [];
 
-let MEMORY_FEEDBACK: Feedback[] = [
-  {
-    id: 'FB-1001',
-    customerName: 'Michael Scott',
-    customerPhone: '+1 (555) 301-4455',
-    dateTime: new Date(Date.now() - 86400000 * 2).toISOString(),
-    status: 'Completed',
-    summary: 'Customer loved the ribeye steak and excellent table service.',
-    sentiment: 'Positive',
-    overallRating: 5,
-    ratings: { food: 5, service: 5, ambiance: 4 },
-    complaints: [],
-    praises: ['Ribeye steak quality', 'Attentive service'],
-    keywords: ['ribeye steak', 'excellent service'],
-    transcript: [
-      { speaker: 'Agent', text: 'Hi Michael! How was your dinner at Y6 Gourmet Bistro yesterday?', timestamp: '00:00' },
-      { speaker: 'Customer', text: 'It was fantastic! The ribeye steak was perfectly cooked and our server was amazing.', timestamp: '00:05' },
-    ],
-    audioUrl: 'https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg',
-    ownerNotes: 'Sent 10% discount voucher for next visit.',
-  },
-  {
-    id: 'FB-1002',
-    customerName: 'Pam Beesly',
-    customerPhone: '+1 (555) 301-6677',
-    dateTime: new Date(Date.now() - 86400000 * 5).toISOString(),
-    status: 'Completed',
-    summary: 'Soup was served cold and main course had a long 35-minute delay.',
-    sentiment: 'Negative',
-    overallRating: 2,
-    ratings: { food: 2, service: 2, ambiance: 4 },
-    complaints: ['Cold soup', 'Long wait time'],
-    praises: [],
-    keywords: ['cold soup', 'delay'],
-    transcript: [
-      { speaker: 'Agent', text: 'Hello Pam! Thank you for dining with us. We would love your quick feedback.', timestamp: '00:00' },
-      { speaker: 'Customer', text: 'Honestly, the soup was lukewarm and we waited 35 minutes for our main course.', timestamp: '00:04' },
-    ],
-    ownerNotes: 'Need to follow up with head chef regarding kitchen timing.',
-  },
-  {
-    id: 'FB-1003',
-    customerName: 'Jim Halpert',
-    customerPhone: '+1 (555) 301-8899',
-    dateTime: new Date(Date.now() - 86400000 * 1).toISOString(),
-    status: 'Completed',
-    summary: 'Delightful atmosphere and wonderful tiramisu dessert.',
-    sentiment: 'Positive',
-    overallRating: 5,
-    ratings: { food: 5, service: 5, ambiance: 5 },
-    complaints: [],
-    praises: ['Tiramisu dessert', 'Great atmosphere'],
-    keywords: ['tiramisu', 'great atmosphere'],
-    transcript: [
-      { speaker: 'Agent', text: 'Hi Jim, how was your experience at Y6 Bistro?', timestamp: '00:00' },
-      { speaker: 'Customer', text: 'Great atmosphere and the tiramisu was incredible!', timestamp: '00:03' },
-    ],
-    ownerNotes: '',
-  },
-];
-
-let MEMORY_DNC: string[] = ['+1 (555) 999-0000', '+91 8888888888'];
-
-export const loginUser = async (email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; message?: string }> => {
+export const sendOtpUser = async (email: string, password: string): Promise<{ success: boolean; otpRequired?: boolean; previewUrl?: string; message?: string }> => {
   try {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await fetch(`${API_BASE}/auth/send-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.warn('[API] Send OTP error:', err);
+    return { success: false, message: 'Server connection error during OTP generation.' };
+  }
+};
+
+export const verifyOtpUser = async (email: string, otp: string): Promise<{ success: boolean; token?: string; user?: any; message?: string }> => {
+  try {
+    const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp }),
     });
     const data = await res.json();
     if (data.success && data.token) {
       setAuthToken(data.token);
       return data;
     }
-  } catch (err) {
-    console.warn('[API] Login fallback active:', err);
+    return data;
+  } catch (err: any) {
+    console.warn('[API] Verify OTP fallback active:', err);
+    setAuthToken('demo_token_12345');
+    return { success: true, token: 'demo_token_12345', user: DEMO_USER };
   }
-  setAuthToken('demo_token_12345');
-  return { success: true, token: 'demo_token_12345', user: DEMO_USER };
+};
+
+export const loginUser = async (email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; message?: string }> => {
+  return await sendOtpUser(email, password);
 };
 
 export const registerUser = async (userData: { name: string; email: string; password: string; restaurantName?: string; phone?: string }) => {
@@ -123,39 +79,35 @@ export const registerUser = async (userData: { name: string; email: string; pass
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
     });
-    const data = await res.json();
-    if (data.success && data.token) {
-      setAuthToken(data.token);
-      return data;
-    }
-  } catch (err) {
-    console.warn('[API] Registration fallback active:', err);
+    return await res.json();
+  } catch (err: any) {
+    console.warn('[API] Registration error:', err);
+    return { success: false, message: 'Server connection error during registration.' };
   }
-  setAuthToken('demo_token_12345');
-  return { success: true, token: 'demo_token_12345', user: { ...DEMO_USER, ...userData } };
 };
 
 export const getMe = async (): Promise<any> => {
-  const headers = await getHeaders();
+  const token = getAuthToken();
+  if (!token) return null;
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
     const res = await fetch(`${API_BASE}/auth/me`, { headers });
     const data = await res.json();
-    return data.user || DEMO_USER;
+    return data.user || null;
   } catch {
-    return DEMO_USER;
+    return null;
   }
 };
 
-export const ensureAuth = async (): Promise<string> => {
-  let token = getAuthToken();
-  if (token) return token;
-
-  const loginRes = await loginUser('owner@y6bistro.com', 'password123');
-  return loginRes.token || 'demo_token_12345';
+export const ensureAuth = async (): Promise<string | null> => {
+  return getAuthToken();
 };
 
 const getHeaders = async () => {
-  const token = await ensureAuth();
+  const token = getAuthToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -198,6 +150,192 @@ const mapBackendFeedback = (f: any): Feedback => {
   };
 };
 
+/* --- AI VOICE CALLS API FUNCTIONS --- */
+
+export const createOutboundCall = async (callData: {
+  contactName: string;
+  phoneNumber: string;
+  purpose: string;
+  customInstructions?: string;
+}): Promise<{ success: boolean; data?: CallRecord; error?: string; message?: string }> => {
+  try {
+    const headers = await getHeaders();
+    const res = await fetch(`${API_BASE}/calls`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(callData),
+    });
+    const json = await res.json();
+
+    if (json.success && json.data) {
+      const c = json.data;
+      const formatted: CallRecord = {
+        id: c._id || c.id || `call_${Date.now()}`,
+        vapiCallId: c.vapiCallId,
+        contactName: c.contactName || callData.contactName,
+        phoneNumber: c.phoneNumber || callData.phoneNumber,
+        purpose: c.purpose || callData.purpose,
+        customInstructions: c.customInstructions || callData.customInstructions,
+        status: c.status || 'queued',
+        startedAt: c.startedAt,
+        duration: c.duration || 0,
+        transcript: c.transcript,
+        summary: c.summary,
+        outcome: c.outcome || 'unknown',
+        sentiment: c.sentiment || 'neutral',
+        nextAction: c.nextAction,
+        createdAt: c.createdAt || new Date().toISOString(),
+      };
+      MEMORY_CALLS.unshift(formatted);
+      return { success: true, data: formatted, message: json.message };
+    }
+    return { success: false, error: json.error || json.message || 'Failed to create call' };
+  } catch (err: any) {
+    console.warn('[API] createOutboundCall network fallback:', err);
+    const mockRecord: CallRecord = {
+      id: `call_${Date.now()}`,
+      vapiCallId: `mock_vapi_${Date.now()}`,
+      contactName: callData.contactName,
+      phoneNumber: callData.phoneNumber,
+      purpose: callData.purpose,
+      customInstructions: callData.customInstructions,
+      status: 'queued',
+      duration: 0,
+      createdAt: new Date().toISOString(),
+    };
+    MEMORY_CALLS.unshift(mockRecord);
+    return { success: true, data: mockRecord };
+  }
+};
+
+export const getCallRecords = async (params?: {
+  search?: string;
+  status?: string;
+  outcome?: string;
+}): Promise<CallRecord[]> => {
+  try {
+    const headers = await getHeaders();
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.status) query.append('status', params.status);
+    if (params?.outcome) query.append('outcome', params.outcome);
+
+    const res = await fetch(`${API_BASE}/calls?${query.toString()}`, { headers });
+    const json = await res.json();
+
+    if (json.success && Array.isArray(json.data)) {
+      return json.data.map((c: any) => ({
+        id: c._id || c.id,
+        vapiCallId: c.vapiCallId,
+        contactName: c.contactName || 'Valued Customer',
+        phoneNumber: c.phoneNumber || '',
+        purpose: c.purpose || '',
+        customInstructions: c.customInstructions || '',
+        status: c.status || 'queued',
+        startedAt: c.startedAt,
+        endedAt: c.endedAt,
+        duration: c.duration || 0,
+        transcript: c.transcript,
+        summary: c.summary,
+        outcome: c.outcome || 'unknown',
+        sentiment: c.sentiment || 'neutral',
+        nextAction: c.nextAction,
+        followUpRequired: c.followUpRequired,
+        followUpReason: c.followUpReason,
+        recordingUrl: c.recordingUrl,
+        errorMessage: c.errorMessage,
+        createdAt: c.createdAt || new Date().toISOString(),
+      }));
+    }
+  } catch (err) {
+    console.warn('[API] getCallRecords fetch fallback:', err);
+  }
+  return MEMORY_CALLS;
+};
+
+export const getCallRecordById = async (id: string): Promise<CallRecord | null> => {
+  try {
+    const headers = await getHeaders();
+    const res = await fetch(`${API_BASE}/calls/${id}`, { headers });
+    const json = await res.json();
+
+    if (json.success && json.data) {
+      const c = json.data;
+      return {
+        id: c._id || c.id,
+        vapiCallId: c.vapiCallId,
+        contactName: c.contactName || 'Valued Customer',
+        phoneNumber: c.phoneNumber || '',
+        purpose: c.purpose || '',
+        customInstructions: c.customInstructions || '',
+        status: c.status || 'queued',
+        startedAt: c.startedAt,
+        endedAt: c.endedAt,
+        duration: c.duration || 0,
+        transcript: c.transcript,
+        summary: c.summary,
+        outcome: c.outcome || 'unknown',
+        sentiment: c.sentiment || 'neutral',
+        nextAction: c.nextAction,
+        followUpRequired: c.followUpRequired,
+        followUpReason: c.followUpReason,
+        recordingUrl: c.recordingUrl,
+        errorMessage: c.errorMessage,
+        createdAt: c.createdAt || new Date().toISOString(),
+      };
+    }
+  } catch (err) {
+    console.warn('[API] getCallRecordById fetch fallback:', err);
+  }
+  return MEMORY_CALLS.find(c => c.id === id || c.vapiCallId === id) || null;
+};
+
+export const deleteCallRecord = async (id: string): Promise<boolean> => {
+  try {
+    const headers = await getHeaders();
+    const res = await fetch(`${API_BASE}/calls/${id}`, { method: 'DELETE', headers });
+    const json = await res.json();
+    if (json.success) {
+      MEMORY_CALLS = MEMORY_CALLS.filter(c => c.id !== id && c.vapiCallId !== id);
+      return true;
+    }
+  } catch (err) {
+    console.warn('[API] deleteCallRecord fallback:', err);
+  }
+  MEMORY_CALLS = MEMORY_CALLS.filter(c => c.id !== id && c.vapiCallId !== id);
+  return true;
+};
+
+export const getCallStats = async (): Promise<CallStats> => {
+  try {
+    const headers = await getHeaders();
+    const res = await fetch(`${API_BASE}/dashboard/stats`, { headers });
+    const json = await res.json();
+
+    if (json.success && json.data) {
+      return json.data;
+    }
+  } catch (err) {
+    console.warn('[API] getCallStats fetch fallback:', err);
+  }
+
+  const completed = MEMORY_CALLS.filter(c => c.status === 'completed').length;
+  const failed = MEMORY_CALLS.filter(c => c.status === 'failed').length;
+  const inProgress = MEMORY_CALLS.filter(c => c.status === 'in-progress' || c.status === 'calling' || c.status === 'queued').length;
+  const completedDurations = MEMORY_CALLS.filter(c => c.duration > 0).map(c => c.duration);
+  const avgDuration = completedDurations.length > 0 ? Math.round(completedDurations.reduce((a, b) => a + b, 0) / completedDurations.length) : 0;
+
+  return {
+    totalCalls: MEMORY_CALLS.length,
+    completed,
+    failed,
+    inProgress,
+    averageDuration: avgDuration,
+  };
+};
+
+/* --- DASHBOARD & FEEDBACK API FUNCTIONS --- */
+
 export const getDashboardData = async (): Promise<{
   metrics: DashboardMetrics;
   chartData: ChartDataPoint[];
@@ -211,30 +349,28 @@ export const getDashboardData = async (): Promise<{
     const d = json.data || {};
 
     if (json.success && d) {
-      const totalFeedback = d.totalFeedback || MEMORY_FEEDBACK.length;
+      const totalFeedback = d.totalFeedback || 0;
+      const defaultChart = [
+        { date: 'Mon', total: 0, positive: 0, negative: 0 },
+        { date: 'Tue', total: 0, positive: 0, negative: 0 },
+        { date: 'Wed', total: 0, positive: 0, negative: 0 },
+        { date: 'Thu', total: 0, positive: 0, negative: 0 },
+        { date: 'Fri', total: 0, positive: 0, negative: 0 },
+        { date: 'Sat', total: 0, positive: 0, negative: 0 },
+        { date: 'Sun', total: 0, positive: 0, negative: 0 },
+      ];
+
       return {
         metrics: {
           totalFeedback,
-          averageRating: d.averageRating || 4.2,
-          positiveFeedbackPercent: d.positivePercentage || 68,
-          negativeFeedbackPercent: d.negativePercentage || 19,
-          responseRatePercent: d.responseRate || 92,
-          trends: { totalFeedback: 18, averageRating: 0.2, positiveFeedbackPercent: 5, negativeFeedbackPercent: -3, responseRatePercent: 2 },
+          averageRating: d.averageRating || 0,
+          positiveFeedbackPercent: d.positivePercentage || 0,
+          negativeFeedbackPercent: d.negativePercentage || 0,
+          responseRatePercent: d.responseRate || 100,
+          trends: { totalFeedback: 0, averageRating: 0, positiveFeedbackPercent: 0, negativeFeedbackPercent: 0, responseRatePercent: 0 },
         },
-        chartData: [
-          { date: 'Mon', total: 65, positive: 45, negative: 10 },
-          { date: 'Tue', total: 59, positive: 40, negative: 12 },
-          { date: 'Wed', total: 80, positive: 60, negative: 8 },
-          { date: 'Thu', total: 81, positive: 55, negative: 15 },
-          { date: 'Fri', total: 56, positive: 42, negative: 8 },
-          { date: 'Sat', total: 95, positive: 70, negative: 15 },
-          { date: 'Sun', total: 49, positive: 35, negative: 5 },
-        ],
-        topIssues: [
-          { issue: 'Delivery Delay', percentage: 43, count: 208 },
-          { issue: 'Food Quality', percentage: 22, count: 106 },
-          { issue: 'Staff Behavior', percentage: 15, count: 72 },
-        ],
+        chartData: Array.isArray(d.feedbackTrends) && d.feedbackTrends.length > 0 ? d.feedbackTrends : defaultChart,
+        topIssues: Array.isArray(d.topIssues) ? d.topIssues : [],
         recentFeedback: MEMORY_FEEDBACK.slice(0, 5),
       };
     }
@@ -245,26 +381,22 @@ export const getDashboardData = async (): Promise<{
   return {
     metrics: {
       totalFeedback: MEMORY_FEEDBACK.length,
-      averageRating: 4.2,
-      positiveFeedbackPercent: 68,
-      negativeFeedbackPercent: 19,
-      responseRatePercent: 92,
-      trends: { totalFeedback: 18, averageRating: 0.2, positiveFeedbackPercent: 5, negativeFeedbackPercent: -3, responseRatePercent: 2 },
+      averageRating: 0,
+      positiveFeedbackPercent: 0,
+      negativeFeedbackPercent: 0,
+      responseRatePercent: 100,
+      trends: { totalFeedback: 0, averageRating: 0, positiveFeedbackPercent: 0, negativeFeedbackPercent: 0, responseRatePercent: 0 },
     },
     chartData: [
-      { date: 'Mon', total: 65, positive: 45, negative: 10 },
-      { date: 'Tue', total: 59, positive: 40, negative: 12 },
-      { date: 'Wed', total: 80, positive: 60, negative: 8 },
-      { date: 'Thu', total: 81, positive: 55, negative: 15 },
-      { date: 'Fri', total: 56, positive: 42, negative: 8 },
-      { date: 'Sat', total: 95, positive: 70, negative: 15 },
-      { date: 'Sun', total: 49, positive: 35, negative: 5 },
+      { date: 'Mon', total: 0, positive: 0, negative: 0 },
+      { date: 'Tue', total: 0, positive: 0, negative: 0 },
+      { date: 'Wed', total: 0, positive: 0, negative: 0 },
+      { date: 'Thu', total: 0, positive: 0, negative: 0 },
+      { date: 'Fri', total: 0, positive: 0, negative: 0 },
+      { date: 'Sat', total: 0, positive: 0, negative: 0 },
+      { date: 'Sun', total: 0, positive: 0, negative: 0 },
     ],
-    topIssues: [
-      { issue: 'Delivery Delay', percentage: 43, count: 208 },
-      { issue: 'Food Quality', percentage: 22, count: 106 },
-      { issue: 'Staff Behavior', percentage: 15, count: 72 },
-    ],
+    topIssues: [],
     recentFeedback: MEMORY_FEEDBACK.slice(0, 5),
   };
 };
@@ -276,7 +408,10 @@ export const getFeedback = async (): Promise<Feedback[]> => {
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
       const mapped = json.data.map(mapBackendFeedback);
-      if (mapped.length > 0) return mapped;
+      if (mapped.length > 0) {
+        MEMORY_FEEDBACK = mapped;
+        return mapped;
+      }
     }
   } catch (err) {
     console.warn('[API] Feedback fetch fallback:', err);
@@ -299,8 +434,8 @@ export const getCustomers = async (): Promise<Customer[]> => {
     const headers = await getHeaders();
     const res = await fetch(`${API_BASE}/customers`, { headers });
     const json = await res.json();
-    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-      return json.data.map((c: any) => ({
+    if (json.success && Array.isArray(json.data)) {
+      const mapped = json.data.map((c: any) => ({
         id: c._id || c.id || c.phone,
         name: c.name || 'Guest Customer',
         phone: c.phone || '+1 (555) 000-0000',
@@ -309,6 +444,10 @@ export const getCustomers = async (): Promise<Customer[]> => {
         lastSentiment: capitalize(c.lastSentiment),
         lastRating: c.lastRating || c.averageRating || 5,
       }));
+      if (mapped.length > 0) {
+        MEMORY_CUSTOMERS = mapped;
+        return mapped;
+      }
     }
   } catch (err) {
     console.warn('[API] Customers fetch fallback:', err);
@@ -325,12 +464,42 @@ export const addCustomer = async (customerData: {
   notes?: string;
   visitDate?: string;
 }): Promise<any> => {
-  // Always update in-memory customers immediately for instant local UI update!
   const newRating = Number(customerData.rating) || 5;
   const sentiment = newRating >= 4 ? 'Positive' : (newRating === 3 ? 'Neutral' : 'Negative');
   const dateStr = customerData.visitDate || new Date().toISOString().split('T')[0];
 
-  const newCust: Customer = {
+  try {
+    const headers = await getHeaders();
+    const res = await fetch(`${API_BASE}/customers`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(customerData),
+    });
+    const json = await res.json();
+    if (json.success && json.data) {
+      const c = json.data.customer || json.data;
+      const formattedCust: Customer = {
+        id: c._id || c.id || c.phone,
+        name: c.name || customerData.name,
+        phone: c.phone || customerData.phone,
+        lastVisit: c.lastVisit ? new Date(c.lastVisit).toISOString().split('T')[0] : dateStr,
+        feedbackCount: c.feedbackCount || 1,
+        lastSentiment: capitalize(c.lastSentiment || sentiment),
+        lastRating: c.lastRating || newRating,
+      };
+      
+      MEMORY_CUSTOMERS.unshift(formattedCust);
+      return {
+        success: true,
+        message: 'Customer added successfully to MongoDB database',
+        data: formattedCust,
+      };
+    }
+  } catch (err) {
+    console.warn('[API] Add customer network request fallback:', err);
+  }
+
+  const fallbackCust: Customer = {
     id: 'c_' + Date.now(),
     name: customerData.name,
     phone: customerData.phone,
@@ -340,75 +509,21 @@ export const addCustomer = async (customerData: {
     lastRating: newRating,
   };
 
-  MEMORY_CUSTOMERS.unshift(newCust);
-
-  const newFeedbackItem: Feedback = {
-    id: 'FB-' + Date.now(),
-    customerName: customerData.name,
-    customerPhone: customerData.phone,
-    dateTime: new Date(dateStr).toISOString(),
-    status: 'Completed',
-    summary: customerData.itemsOrdered ? `Ordered: ${customerData.itemsOrdered}. ${customerData.notes || ''}` : customerData.notes || 'Added customer visit',
-    sentiment: sentiment,
-    overallRating: newRating,
-    ratings: { food: newRating, service: newRating, ambiance: newRating },
-    complaints: [],
-    praises: customerData.itemsOrdered ? [customerData.itemsOrdered] : [],
-    keywords: [],
-    transcript: [
-      { speaker: 'Agent', text: `Recorded visit for ${customerData.name}.`, timestamp: '00:00' },
-      { speaker: 'Customer', text: customerData.itemsOrdered ? `Ordered: ${customerData.itemsOrdered}` : 'Enjoyed visit', timestamp: '00:02' }
-    ],
-    ownerNotes: customerData.notes || '',
-  };
-
-  MEMORY_FEEDBACK.unshift(newFeedbackItem);
-
-  try {
-    const headers = await getHeaders();
-    await fetch(`${API_BASE}/customers`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(customerData),
-    });
-  } catch (err) {
-    console.warn('[API] Add customer network request fallback:', err);
-  }
-
+  MEMORY_CUSTOMERS.unshift(fallbackCust);
   return {
     success: true,
     message: 'Customer added successfully',
-    data: newCust,
+    data: fallbackCust,
   };
 };
 
 export const triggerCustomerCall = async (customerPhone: string, customerName: string, customTranscript?: string): Promise<any> => {
-  const headers = await getHeaders();
-  const transcript = customTranscript || `Agent: Hello ${customerName}! Thank you for dining with us at Y6 Gourmet Bistro. How was your food and service today?\nCustomer: Food was delicious and service was quick!`;
-  try {
-    const res = await fetch(`${API_BASE}/calls/simulate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        customerName,
-        customerPhone,
-        rawTranscript: transcript,
-      }),
-    });
-    return await res.json();
-  } catch (err) {
-    console.warn('[API] Trigger call fallback:', err);
-    return {
-      success: true,
-      message: `AI Call triggered and analyzed for ${customerName}`,
-      callLog: {
-        customerName,
-        customerPhone,
-        sentimentLabel: 'positive',
-        summary: `AI voice agent called ${customerName} to collect dining feedback.`,
-      },
-    };
-  }
+  return await createOutboundCall({
+    contactName: customerName,
+    phoneNumber: customerPhone,
+    purpose: 'Post-visit dining feedback',
+    customInstructions: customTranscript,
+  });
 };
 
 export const getCustomerById = async (id: string): Promise<Customer | undefined> => {
@@ -440,16 +555,8 @@ export const getInsights = async (): Promise<{
       const dashboardData = await getDashboardData();
       return {
         ratingOverTime: dashboardData.chartData,
-        topComplaints: topComplaints.length > 0 ? topComplaints : [
-          { issue: 'Delivery Delay', percentage: 43, count: 208 },
-          { issue: 'Food Quality', percentage: 22, count: 106 },
-          { issue: 'Staff Behavior', percentage: 15, count: 72 },
-        ],
-        topPraises: topPraises.length > 0 ? topPraises : [
-          { issue: 'Food Quality', percentage: 48, count: 232 },
-          { issue: 'Staff Service', percentage: 25, count: 121 },
-          { issue: 'Ambience', percentage: 15, count: 72 },
-        ],
+        topComplaints: topComplaints.length > 0 ? topComplaints : [],
+        topPraises: topPraises.length > 0 ? topPraises : [],
       };
     }
   } catch (err) {
@@ -459,16 +566,8 @@ export const getInsights = async (): Promise<{
   const dashboardData = await getDashboardData();
   return {
     ratingOverTime: dashboardData.chartData,
-    topComplaints: [
-      { issue: 'Delivery Delay', percentage: 43, count: 208 },
-      { issue: 'Food Quality', percentage: 22, count: 106 },
-      { issue: 'Staff Behavior', percentage: 15, count: 72 },
-    ],
-    topPraises: [
-      { issue: 'Food Quality', percentage: 48, count: 232 },
-      { issue: 'Staff Service', percentage: 25, count: 121 },
-      { issue: 'Ambience', percentage: 15, count: 72 },
-    ],
+    topComplaints: [],
+    topPraises: [],
   };
 };
 

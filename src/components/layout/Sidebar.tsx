@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Phone, BarChart2, Users, FileText, Settings, LogOut, Mic, MessageSquare } from 'lucide-react';
+import { Home, PhoneCall, Phone, BarChart2, Users, FileText, Settings, LogOut, Mic, MessageSquare } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -8,17 +8,16 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-
-const navItems = [
+  const navItems = [
     { name: 'Home', path: '/', icon: Home },
-    { name: 'Calls / Feedback', path: '/feedback', icon: Phone },
+    { name: 'AI Voice Calls', path: '/calls', icon: PhoneCall },
+    { name: 'Feedback Logs', path: '/feedback', icon: Phone },
     { name: 'Insights', path: '/insights', icon: BarChart2 },
     { name: 'Customers', path: '/customers', icon: Users },
     { name: 'Reports', path: '/reports', icon: FileText },
     { name: 'Settings', path: '/settings', icon: Settings },
-    { name: 'Voice Agent', path: '/voice-agent', icon: Mic }, // <-- Must be present here
+    { name: 'Voice Concierge', path: '/voice-agent', icon: Mic },
   ];
-  
 
   const handleLogout = () => {
     logout();
