@@ -361,30 +361,6 @@ export function Login() {
                   <>We sent a 6-digit code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.</>
                 )}
               </p>
-
-              {sentOtpCode && (
-                <div className="pt-1.5 font-mono text-sm font-bold text-indigo-900">
-                  <span>Your Verification Code: </span>
-                  <span className="bg-indigo-100 border border-indigo-300 px-2.5 py-1 rounded-md tracking-widest text-indigo-950 select-all">
-                    {sentOtpCode}
-                  </span>
-                </div>
-              )}
-
-              {/* Preview Ethereal Inbox Link for Test Mode */}
-              {previewUrl && (
-                <div className="pt-1">
-                  <a
-                    href={previewUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center space-x-1 font-semibold text-indigo-600 bg-white border border-indigo-200 px-3 py-1.5 rounded-lg shadow-sm hover:bg-indigo-50 transition-all text-[11px]"
-                  >
-                    <span>📬 View Sent Email Message</span>
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              )}
             </div>
 
             {error && (

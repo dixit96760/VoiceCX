@@ -98,8 +98,6 @@ const sendOtp = async (req, res) => {
         ? `A 6-digit verification code was sent to your phone via SMS` 
         : `A 6-digit verification code was sent to ${cleanEmail}`,
       otpRequired: true,
-      otpCode: otpCode, // Included for instant sandbox UI entry
-      previewUrl: previewUrl,
       deliveryMethod: method
     });
   } catch (error) {
@@ -342,8 +340,6 @@ const forgotPassword = async (req, res) => {
         ? `A 6-digit reset code was sent to your phone via SMS`
         : `A 6-digit reset code was sent to ${cleanEmail}`,
       otpRequired: true,
-      otpCode: otpCode,
-      previewUrl: previewUrl,
       deliveryMethod: method
     });
   } catch (error) {
