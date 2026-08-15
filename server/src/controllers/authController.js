@@ -73,9 +73,17 @@ const sendOtp = async (req, res) => {
 
     let method = 'email';
     let previewUrl = null;
+    let userPhone = null;
 
-    if (isDb && typeof user !== 'undefined' && user && user.phone && !user.phone.includes('+1 (555) 000-0000')) {
-      const smsResult = await sendOtpWhatsApp(user.phone, otpCode);
+    if (isDb) {
+      const userDoc = await User.findOne({ email: cleanEmail });
+      if (userDoc && userDoc.phone && !userDoc.phone.includes('+1 (555) 000-0000')) {
+        userPhone = userDoc.phone;
+      }
+    }
+
+    if (userPhone) {
+      const smsResult = await sendOtpWhatsApp(userPhone, otpCode);
       if (smsResult.success) method = 'whatsapp';
     }
 
