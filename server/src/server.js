@@ -27,6 +27,17 @@ app.post('/api/webhooks/twilio/voice', handleTwilioVoiceWebhook);
 app.post('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
 app.get('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
 
+// Dedicated basic endpoint for Twilio incoming calls
+app.post('/voice', (req, res) => {
+  res.set('Content-Type', 'text/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>
+        Hello, your call is connected successfully.
+    </Say>
+</Response>`);
+});
+
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/calls', require('./routes/callRoutes'));

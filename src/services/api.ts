@@ -102,6 +102,32 @@ export const getMe = async (): Promise<any> => {
   }
 };
 
+export const forgotPasswordUser = async (email: string) => {
+  try {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: 'Server connection error.' };
+  }
+};
+
+export const resetPasswordUser = async (email: string, otp: string, newPassword: string) => {
+  try {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, newPassword }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: 'Server connection error.' };
+  }
+};
+
 export const ensureAuth = async (): Promise<string | null> => {
   return getAuthToken();
 };

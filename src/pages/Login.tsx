@@ -4,11 +4,11 @@ import { MessageSquare, Lock, Mail, ArrowRight, ShieldCheck, UserPlus, Building,
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { registerUser, sendOtpUser, verifyOtpUser, setAuthToken } from '../services/api';
+import { registerUser, sendOtpUser, verifyOtpUser, setAuthToken, forgotPasswordUser, resetPasswordUser } from '../services/api';
 
 export function Login() {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
+  const [step, setStep] = useState<'credentials' | 'otp' | 'forgot-password' | 'reset-password'>('credentials');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -118,6 +118,62 @@ export function Login() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    
+    try {
+      const res = await forgotPasswordUser(email.trim());
+      if (res.success) {
+        if (res.previewUrl) setPreviewUrl(res.previewUrl);
+        setStep('reset-password');
+        setTimer(60);
+        setOtpDigits(['', '', '', '', '', '']);
+      } else {
+        setError(res.message || 'Failed to request password reset.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Connection error.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const otpCode = otpDigits.join('');
+    if (otpCode.length < 6) {
+      setError('Please enter the complete 6-digit code.');
+      return;
+    }
+    if (!password.trim()) {
+      setError('Please enter a new password.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const res = await resetPasswordUser(email.trim(), otpCode, password.trim());
+      if (res.success) {
+        setStep('credentials');
+        setError('');
+        alert('Password reset successfully! You can now sign in.');
+      } else {
+        setError(res.message || 'Failed to reset password.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Reset password failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) value = value.slice(-1);
     const updated = [...otpDigits];
@@ -148,6 +204,10 @@ export function Login() {
           <p className="text-sm text-[var(--color-text-muted)]">
             {step === 'otp'
               ? 'Check your email inbox for your 6-digit OTP'
+              : step === 'forgot-password'
+              ? 'Enter your email to receive a reset code'
+              : step === 'reset-password'
+              ? 'Enter the 6-digit code and your new password'
               : isRegisterMode
               ? 'Create a new restaurant owner account'
               : 'Sign in to your restaurant dashboard'}
@@ -253,6 +313,17 @@ export function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                {!isRegisterMode && (
+                  <div className="text-right pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setStep('forgot-password'); setError(''); }}
+                      className="text-[11px] font-medium text-[var(--color-primary-500)] hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
               </div>
 
               <Button type="submit" disabled={submitting} className="w-full flex items-center justify-center space-x-2">
@@ -353,6 +424,130 @@ export function Login() {
                 type="button"
                 disabled={timer > 0}
                 onClick={handleSendOtp}
+                className={`flex items-center space-x-1 ${
+                  timer > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:underline font-semibold text-[var(--color-primary-500)]'
+                }`}
+              >
+                <RefreshCw className={`h-3 w-3 ${timer > 0 ? 'animate-spin' : ''}`} />
+                <span>{timer > 0 ? `Resend Email in ${timer}s` : 'Resend Email OTP'}</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 3: Forgot Password Request Form */}
+        {step === 'forgot-password' && (
+          <form onSubmit={handleForgotPassword} className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            {error && (
+              <div className="p-3 rounded-lg bg-[var(--color-negative-bg)] text-[var(--color-negative-500)] text-xs font-medium border border-red-200">
+                {error}
+              </div>
+            )}
+            
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] flex items-center">
+                <Mail className="h-3.5 w-3.5 mr-1 text-[var(--color-primary-500)]" /> Email Address
+              </label>
+              <Input 
+                type="email"
+                placeholder="yourname@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <Button type="submit" disabled={submitting} className="w-full flex items-center justify-center space-x-2">
+              <span>{submitting ? 'Sending Request...' : 'Send Reset Code'}</span>
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+
+            <div className="text-center text-xs pt-2 text-[var(--color-text-muted)] border-t border-[var(--color-border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setStep('credentials')}
+                className="hover:underline font-medium text-[var(--color-primary-500)]"
+              >
+                ← Back to Login
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 4: Reset Password OTP Form */}
+        {step === 'reset-password' && (
+          <form onSubmit={handleResetPassword} className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            {/* Success Alert Banner */}
+            <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-900 text-xs text-center space-y-2">
+              <div className="flex items-center justify-center space-x-1.5 font-bold text-indigo-700">
+                <CheckCircle2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span>Reset Code Sent!</span>
+              </div>
+              <p className="text-[13px] leading-snug text-indigo-800">
+                We sent a 6-digit reset code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-lg bg-[var(--color-negative-bg)] text-[var(--color-negative-500)] text-xs font-medium border border-red-200">
+                {error}
+              </div>
+            )}
+
+            {/* 6-Digit OTP Box Inputs */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] text-center block">
+                Enter 6-Digit Code
+              </label>
+              <div className="flex justify-center gap-2">
+                {otpDigits.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => (otpInputRefs.current[idx] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                    className="w-11 h-12 text-center text-lg font-bold font-mono border-2 border-gray-300 rounded-xl focus:outline-none focus:border-[var(--color-primary-500)] focus:ring-2 focus:ring-[var(--color-primary-500)]/20 transition-all"
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1 mt-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] flex items-center">
+                <Lock className="h-3.5 w-3.5 mr-1 text-[var(--color-primary-500)]" /> New Password
+              </label>
+              <Input 
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <Button type="submit" disabled={submitting} className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700">
+              <KeyRound className="h-4 w-4" />
+              <span>{submitting ? 'Resetting Password...' : 'Reset Password'}</span>
+            </Button>
+
+            {/* Resend & Back */}
+            <div className="flex items-center justify-between text-xs pt-2 text-[var(--color-text-muted)] border-t border-[var(--color-border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setStep('credentials')}
+                className="hover:underline font-medium text-[var(--color-primary-500)]"
+              >
+                ← Back to Login
+              </button>
+
+              <button
+                type="button"
+                disabled={timer > 0}
+                onClick={handleForgotPassword}
                 className={`flex items-center space-x-1 ${
                   timer > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:underline font-semibold text-[var(--color-primary-500)]'
                 }`}
