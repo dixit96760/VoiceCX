@@ -79,7 +79,11 @@ export const registerUser = async (userData: { name: string; email: string; pass
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
     });
-    return await res.json();
+    const data = await res.json();
+    if (data.success && data.token) {
+      setAuthToken(data.token);
+    }
+    return data;
   } catch (err: any) {
     console.warn('[API] Registration error:', err);
     return { success: false, message: 'Server connection error during registration.' };

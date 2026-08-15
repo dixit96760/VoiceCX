@@ -11,39 +11,8 @@ const protect = async (req, res, next) => {
 
   const isDb = getIsConnected();
 
-  // Helper to ensure valid MongoDB user document is attached
-  const attachDefaultUser = async () => {
-    if (isDb) {
-      try {
-        let dbUser = await User.findOne({ email: 'owner@y6bistro.com' });
-        if (!dbUser) {
-          dbUser = await User.create({
-            name: 'Chef Sarah Jenkins',
-            email: 'owner@y6bistro.com',
-            password: 'password123',
-            restaurantName: 'Y6 Gourmet Bistro',
-            phone: '+1 (555) 234-5678',
-          });
-        }
-        req.user = dbUser;
-        req.user.id = dbUser._id;
-        return;
-      } catch (err) {
-        console.warn('Error fetching default user:', err.message);
-      }
-    }
-    req.user = {
-      _id: 'owner_demo_id_12345',
-      id: 'owner_demo_id_12345',
-      name: 'Chef Sarah Jenkins',
-      email: 'owner@y6bistro.com',
-      restaurantName: 'Y6 Gourmet Bistro',
-    };
-  };
-
   if (!isDb || !token || token === 'demo_token_12345' || token === 'null' || token === 'undefined') {
-    await attachDefaultUser();
-    return next();
+    return res.status(401).json({ success: false, message: 'Not authorized, no token provided' });
   }
 
   try {
@@ -52,7 +21,7 @@ const protect = async (req, res, next) => {
 
     const user = await User.findById(decoded.id).select('-password');
     if (!user) {
-      await attachDefaultUser();
+      return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
     } else {
       req.user = user;
       req.user.id = user._id;
@@ -60,9 +29,7 @@ const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
-    // Fallback to default user if token verification fails so app never blocks
-    await attachDefaultUser();
-    next();
+    return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
   }
 };
 
