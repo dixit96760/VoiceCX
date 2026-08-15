@@ -49,6 +49,13 @@ app.use('/api/do-not-call', require('./routes/dncRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
 
+// New Engine Routes
+app.use('/api/insights', require('./routes/insightRoutes'));
+app.use('/api/kpis', require('./routes/kpiRoutes'));
+app.use('/api/anomalies', require('./routes/anomalyRoutes'));
+app.use('/api/actions', require('./routes/actionRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+
 // Legacy feature routes for compatibility
 app.use('/api/restaurant', require('./routes/restaurantRoutes'));
 

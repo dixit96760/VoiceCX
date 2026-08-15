@@ -16,7 +16,6 @@ export function Sidebar() {
     { name: 'Customers', path: '/customers', icon: Users },
     { name: 'Reports', path: '/reports', icon: FileText },
     { name: 'Settings', path: '/settings', icon: Settings },
-    { name: 'Voice Concierge', path: '/voice-agent', icon: Mic },
   ];
 
   const handleLogout = () => {
