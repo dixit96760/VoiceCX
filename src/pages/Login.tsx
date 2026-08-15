@@ -7,7 +7,7 @@ import { Input } from '../components/ui/Input';
 import { registerUser, sendOtpUser, verifyOtpUser, setAuthToken, forgotPasswordUser, resetPasswordUser } from '../services/api';
 
 export function Login() {
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(true);
   const [step, setStep] = useState<'credentials' | 'otp' | 'forgot-password' | 'reset-password'>('credentials');
 
   const [email, setEmail] = useState('');
