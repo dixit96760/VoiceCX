@@ -84,7 +84,7 @@ const sendOtp = async (req, res) => {
 
     if (userPhone) {
       const smsResult = await sendOtpWhatsApp(userPhone, otpCode);
-      if (smsResult.success) method = 'whatsapp';
+      if (smsResult.success) method = 'sms';
     }
 
     if (method === 'email') {
@@ -94,8 +94,8 @@ const sendOtp = async (req, res) => {
 
     res.json({
       success: true,
-      message: method === 'whatsapp' 
-        ? `A 6-digit verification code was sent to your WhatsApp` 
+      message: method === 'sms' 
+        ? `A 6-digit verification code was sent to your phone via SMS` 
         : `A 6-digit verification code was sent to ${cleanEmail}`,
       otpRequired: true,
       otpCode: otpCode, // Included for instant sandbox UI entry
@@ -328,7 +328,7 @@ const forgotPassword = async (req, res) => {
 
     if (userPhone) {
       const smsResult = await sendOtpWhatsApp(userPhone, otpCode);
-      if (smsResult.success) method = 'whatsapp';
+      if (smsResult.success) method = 'sms';
     }
 
     if (method === 'email') {
@@ -338,8 +338,8 @@ const forgotPassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: method === 'whatsapp'
-        ? `A 6-digit reset code was sent to your WhatsApp`
+      message: method === 'sms'
+        ? `A 6-digit reset code was sent to your phone via SMS`
         : `A 6-digit reset code was sent to ${cleanEmail}`,
       otpRequired: true,
       otpCode: otpCode,

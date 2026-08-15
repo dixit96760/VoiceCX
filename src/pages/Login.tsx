@@ -355,6 +355,8 @@ export function Login() {
               <p className="text-[13px] leading-snug text-indigo-800">
                 {deliveryMethod === 'whatsapp' ? (
                   <>We sent a 6-digit code via WhatsApp to the phone number associated with <span className="font-semibold">{email}</span>. Please check your WhatsApp app.</>
+                ) : deliveryMethod === 'sms' ? (
+                  <>We sent a 6-digit code via SMS to the phone number associated with <span className="font-semibold">{email}</span>. Please check your text messages.</>
                 ) : (
                   <>We sent a 6-digit code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.</>
                 )}
@@ -494,6 +496,8 @@ export function Login() {
               <p className="text-[13px] leading-snug text-indigo-800">
                 {deliveryMethod === 'whatsapp' ? (
                   <>We sent a 6-digit reset code via WhatsApp to the phone number associated with <span className="font-semibold">{email}</span>.</>
+                ) : deliveryMethod === 'sms' ? (
+                  <>We sent a 6-digit reset code via SMS to the phone number associated with <span className="font-semibold">{email}</span>.</>
                 ) : (
                   <>We sent a 6-digit reset code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.</>
                 )}
@@ -574,7 +578,7 @@ export function Login() {
         <div className="text-center pt-2 border-t border-[var(--color-border-subtle)]">
           <p className="text-xs text-[var(--color-text-verymuted)] flex items-center justify-center">
             <ShieldCheck className="h-3.5 w-3.5 mr-1 text-[var(--color-positive-500)]" />
-            Protected by Real-Time WhatsApp & Email OTP
+            Protected by Real-Time SMS & Email OTP
           </p>
         </div>
 

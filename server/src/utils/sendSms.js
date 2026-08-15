@@ -19,20 +19,19 @@ const sendOtpWhatsApp = async (toPhone, otpCode) => {
       cleanPhone = `+1${cleanPhone.replace(/\D/g, '')}`; // fallback default to +1
     }
 
-    // WhatsApp requires the 'whatsapp:' prefix for both sender and receiver
-    const twilioFrom = fromPhone.startsWith('whatsapp:') ? fromPhone : `whatsapp:${fromPhone}`;
-    const twilioTo = `whatsapp:${cleanPhone}`;
+    const twilioFrom = fromPhone;
+    const twilioTo = cleanPhone;
 
     const message = await client.messages.create({
-      body: `Your VoiceCX verification code is: *${otpCode}*. It expires in 5 minutes.`,
+      body: `Your VoiceCX verification code is: ${otpCode}. It expires in 5 minutes.`,
       from: twilioFrom,
       to: twilioTo
     });
 
-    console.log(`[WhatsApp] Sent OTP to ${twilioTo}. Message SID: ${message.sid}`);
+    console.log(`[SMS] Sent OTP to ${twilioTo}. Message SID: ${message.sid}`);
     return { success: true, sid: message.sid };
   } catch (error) {
-    console.error('[WhatsApp] Failed to send message:', error.message);
+    console.error('[SMS] Failed to send message:', error.message);
     return { success: false, message: error.message };
   }
 };
