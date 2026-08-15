@@ -32,12 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (u) {
           setUser(u);
         } else {
-          setUser({
-            name: 'Chef Sarah Jenkins',
-            email: 'owner@y6bistro.com',
-            restaurantName: 'Y6 Gourmet Bistro',
-            phone: '+1 (555) 234-5678',
-          });
+          logoutUser();
+          setUser(null);
         }
       }
       setLoading(false);
