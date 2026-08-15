@@ -33,7 +33,7 @@ let MEMORY_FEEDBACK: Feedback[] = [];
 let MEMORY_DNC: string[] = [];
 let MEMORY_CALLS: CallRecord[] = [];
 
-export const sendOtpUser = async (email: string, password: string): Promise<{ success: boolean; otpRequired?: boolean; previewUrl?: string; otpCode?: string; message?: string }> => {
+export const sendOtpUser = async (email: string, password: string): Promise<{ success: boolean; otpRequired?: boolean; previewUrl?: string; otpCode?: string; message?: string; deliveryMethod?: string }> => {
   try {
     const res = await fetch(`${API_BASE}/auth/send-otp`, {
       method: 'POST',

@@ -5,6 +5,7 @@ const Otp = require('../models/Otp');
 const Setting = require('../models/Setting');
 const { getIsConnected } = require('../config/db');
 const { sendOtpEmail } = require('../utils/sendEmail');
+const { sendOtpWhatsApp } = require('../utils/sendSms');
 
 // Memory store backup
 const memoryOtpStore = new Map();
@@ -70,15 +71,28 @@ const sendOtp = async (req, res) => {
     console.log(`[AUTHENTICATION OTP] CODE FOR ${cleanEmail}: ${otpCode}`);
     console.log(`=======================================================`);
 
-    // Dispatch email via Nodemailer
-    const emailResult = await sendOtpEmail(cleanEmail, otpCode);
+    let method = 'email';
+    let previewUrl = null;
+
+    if (isDb && typeof user !== 'undefined' && user && user.phone && !user.phone.includes('+1 (555) 000-0000')) {
+      const smsResult = await sendOtpWhatsApp(user.phone, otpCode);
+      if (smsResult.success) method = 'whatsapp';
+    }
+
+    if (method === 'email') {
+      const emailResult = await sendOtpEmail(cleanEmail, otpCode);
+      previewUrl = emailResult.previewUrl || null;
+    }
 
     res.json({
       success: true,
-      message: `A 6-digit verification code was sent to ${cleanEmail}`,
+      message: method === 'whatsapp' 
+        ? `A 6-digit verification code was sent to your WhatsApp` 
+        : `A 6-digit verification code was sent to ${cleanEmail}`,
       otpRequired: true,
       otpCode: otpCode, // Included for instant sandbox UI entry
-      previewUrl: emailResult.previewUrl || null,
+      previewUrl: previewUrl,
+      deliveryMethod: method
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -293,14 +307,36 @@ const forgotPassword = async (req, res) => {
     console.log(`[FORGOT PASSWORD OTP] CODE FOR ${cleanEmail}: ${otpCode}`);
     console.log(`=======================================================`);
 
-    const emailResult = await sendOtpEmail(cleanEmail, otpCode);
+    let method = 'email';
+    let previewUrl = null;
+    let userPhone = null;
+
+    if (isDb) {
+      const userDoc = await User.findOne({ email: cleanEmail });
+      if (userDoc && userDoc.phone && !userDoc.phone.includes('+1 (555) 000-0000')) {
+        userPhone = userDoc.phone;
+      }
+    }
+
+    if (userPhone) {
+      const smsResult = await sendOtpWhatsApp(userPhone, otpCode);
+      if (smsResult.success) method = 'whatsapp';
+    }
+
+    if (method === 'email') {
+      const emailResult = await sendOtpEmail(cleanEmail, otpCode);
+      previewUrl = emailResult.previewUrl || null;
+    }
 
     res.json({
       success: true,
-      message: `A 6-digit reset code was sent to ${cleanEmail}`,
+      message: method === 'whatsapp'
+        ? `A 6-digit reset code was sent to your WhatsApp`
+        : `A 6-digit reset code was sent to ${cleanEmail}`,
       otpRequired: true,
       otpCode: otpCode,
-      previewUrl: emailResult.previewUrl || null,
+      previewUrl: previewUrl,
+      deliveryMethod: method
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

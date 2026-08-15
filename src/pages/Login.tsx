@@ -20,6 +20,7 @@ export function Login() {
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [sentOtpCode, setSentOtpCode] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [deliveryMethod, setDeliveryMethod] = useState<string>('email');
   const [timer, setTimer] = useState(60);
 
   const [error, setError] = useState('');
@@ -61,6 +62,7 @@ export function Login() {
         if (res.success) {
           if (res.previewUrl) setPreviewUrl(res.previewUrl);
           if (res.otpCode) setSentOtpCode(res.otpCode);
+          if (res.deliveryMethod) setDeliveryMethod(res.deliveryMethod);
           setStep('otp');
           setTimer(60);
           setOtpDigits(['', '', '', '', '', '']);
@@ -78,6 +80,7 @@ export function Login() {
         if (res.success) {
           if (res.previewUrl) setPreviewUrl(res.previewUrl);
           if (res.otpCode) setSentOtpCode(res.otpCode);
+          if (res.deliveryMethod) setDeliveryMethod(res.deliveryMethod);
           setStep('otp');
           setTimer(60);
           setOtpDigits(['', '', '', '', '', '']);
@@ -131,6 +134,7 @@ export function Login() {
       const res = await forgotPasswordUser(email.trim());
       if (res.success) {
         if (res.previewUrl) setPreviewUrl(res.previewUrl);
+        if (res.deliveryMethod) setDeliveryMethod(res.deliveryMethod);
         setStep('reset-password');
         setTimer(60);
         setOtpDigits(['', '', '', '', '', '']);
@@ -349,7 +353,11 @@ export function Login() {
                 <span>Verification OTP Sent!</span>
               </div>
               <p className="text-[13px] leading-snug text-indigo-800">
-                We sent a 6-digit code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.
+                {deliveryMethod === 'whatsapp' ? (
+                  <>We sent a 6-digit code via WhatsApp to the phone number associated with <span className="font-semibold">{email}</span>. Please check your WhatsApp app.</>
+                ) : (
+                  <>We sent a 6-digit code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.</>
+                )}
               </p>
 
               {sentOtpCode && (
@@ -484,7 +492,11 @@ export function Login() {
                 <span>Reset Code Sent!</span>
               </div>
               <p className="text-[13px] leading-snug text-indigo-800">
-                We sent a 6-digit reset code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.
+                {deliveryMethod === 'whatsapp' ? (
+                  <>We sent a 6-digit reset code via WhatsApp to the phone number associated with <span className="font-semibold">{email}</span>.</>
+                ) : (
+                  <>We sent a 6-digit reset code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.</>
+                )}
               </p>
             </div>
 
@@ -562,7 +574,7 @@ export function Login() {
         <div className="text-center pt-2 border-t border-[var(--color-border-subtle)]">
           <p className="text-xs text-[var(--color-text-verymuted)] flex items-center justify-center">
             <ShieldCheck className="h-3.5 w-3.5 mr-1 text-[var(--color-positive-500)]" />
-            Protected by Real Email OTP & MongoDB Atlas Cloud
+            Protected by Real-Time WhatsApp & Email OTP
           </p>
         </div>
 
