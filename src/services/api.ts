@@ -18,14 +18,6 @@ export const logoutUser = () => {
   localStorage.removeItem('voicecx_token');
 };
 
-const DEMO_USER = {
-  _id: 'owner_demo_id_12345',
-  id: 'owner_demo_id_12345',
-  name: 'Chef Sarah Jenkins',
-  email: 'owner@y6bistro.com',
-  restaurantName: 'Y6 Gourmet Bistro',
-  phone: '+1 (555) 234-5678',
-};
 
 // In-memory data store fallbacks for zero-error client execution
 let MEMORY_CUSTOMERS: Customer[] = [];
@@ -62,9 +54,8 @@ export const verifyOtpUser = async (email: string, otp: string): Promise<{ succe
     }
     return data;
   } catch (err: any) {
-    console.warn('[API] Verify OTP fallback active:', err);
-    setAuthToken('demo_token_12345');
-    return { success: true, token: 'demo_token_12345', user: DEMO_USER };
+    console.warn('[API] Verify OTP error:', err);
+    return { success: false, message: 'Server connection error during OTP verification.' };
   }
 };
 
