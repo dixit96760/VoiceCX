@@ -11,6 +11,7 @@ import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
+// @ts-ignore
 import VoiceAgent from './components/VoiceAgent';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
