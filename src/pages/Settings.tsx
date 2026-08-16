@@ -7,7 +7,7 @@ import { getDoNotCallList, addDoNotCallNumber, removeDoNotCallNumber } from '../
 import { Trash2 } from 'lucide-react';
 
 export function Settings() {
-  const [dncList, setDncList] = useState<string[]>([]);
+  const [dncList, setDncList] = useState<any[]>([]);
   const [newNumber, setNewNumber] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   
@@ -33,8 +33,8 @@ export function Settings() {
     setIsAdding(false);
   };
 
-  const handleRemoveDnc = async (phone: string) => {
-    await removeDoNotCallNumber(phone);
+  const handleRemoveDnc = async (id: string) => {
+    await removeDoNotCallNumber(id);
     const updated = await getDoNotCallList();
     setDncList(updated);
   };
@@ -129,11 +129,11 @@ export function Settings() {
                 </div>
               ) : (
                 <ul className="divide-y divide-[var(--color-border-subtle)]">
-                  {dncList.map(phone => (
-                    <li key={phone} className="flex items-center justify-between p-3 text-sm">
-                      <span className="font-medium text-[var(--color-text-primary)]">{phone}</span>
+                  {dncList.map(item => (
+                    <li key={item._id} className="flex items-center justify-between p-3 text-sm">
+                      <span className="font-medium text-[var(--color-text-primary)]">{item.phoneNumber}</span>
                       <button 
-                        onClick={() => handleRemoveDnc(phone)}
+                        onClick={() => handleRemoveDnc(item._id)}
                         className="text-[var(--color-text-muted)] hover:text-[var(--color-negative-500)] p-1 rounded transition-colors"
                         title="Remove"
                       >

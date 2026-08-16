@@ -1,4 +1,4 @@
-import type { Feedback, Customer, DashboardMetrics, ChartDataPoint, RankedIssue, CallRecord, CallStats } from '../types';
+import type { Feedback, Customer, DashboardMetrics, ChartDataPoint, RankedIssue, CallRecord, CallStats, DoNotCall, AppNotification } from '../types';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -22,7 +22,7 @@ export const logoutUser = () => {
 // In-memory data store fallbacks for zero-error client execution
 let MEMORY_CUSTOMERS: Customer[] = [];
 let MEMORY_FEEDBACK: Feedback[] = [];
-let MEMORY_DNC: string[] = [];
+let MEMORY_DNC: DoNotCall[] = [];
 let MEMORY_CALLS: CallRecord[] = [];
 
 export const sendOtpUser = async (email: string, password: string): Promise<{ success: boolean; otpRequired?: boolean; previewUrl?: string; otpCode?: string; message?: string; deliveryMethod?: string }> => {
@@ -592,13 +592,13 @@ export const getInsights = async (): Promise<{
   };
 };
 
-export const getDoNotCallList = async (): Promise<string[]> => {
+export const getDoNotCallList = async (): Promise<DoNotCall[]> => {
   try {
     const headers = await getHeaders();
     const res = await fetch(`${API_BASE}/do-not-call`, { headers });
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
-      return json.data.map((item: any) => item.phoneNumber || item);
+      return json.data;
     }
   } catch (err) {
     console.warn('[API] DNC list fetch fallback:', err);
@@ -607,8 +607,8 @@ export const getDoNotCallList = async (): Promise<string[]> => {
 };
 
 export const addDoNotCallNumber = async (phoneNumber: string): Promise<void> => {
-  if (!MEMORY_DNC.includes(phoneNumber)) {
-    MEMORY_DNC.unshift(phoneNumber);
+  if (!MEMORY_DNC.find(d => d.phoneNumber === phoneNumber)) {
+    MEMORY_DNC.unshift({ _id: 'temp_' + Date.now(), phoneNumber });
   }
   try {
     const headers = await getHeaders();
@@ -622,16 +622,42 @@ export const addDoNotCallNumber = async (phoneNumber: string): Promise<void> => 
   }
 };
 
-export const removeDoNotCallNumber = async (phoneOrId: string): Promise<void> => {
-  MEMORY_DNC = MEMORY_DNC.filter(p => p !== phoneOrId);
+export const removeDoNotCallNumber = async (id: string): Promise<void> => {
+  MEMORY_DNC = MEMORY_DNC.filter(p => p._id !== id);
   try {
     const headers = await getHeaders();
-    await fetch(`${API_BASE}/do-not-call/${encodeURIComponent(phoneOrId)}`, {
+    await fetch(`${API_BASE}/do-not-call/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers,
     });
   } catch (err) {
     console.warn('[API] Remove DNC fallback:', err);
+  }
+};
+
+export const getNotifications = async (): Promise<AppNotification[]> => {
+  try {
+    const headers = await getHeaders();
+    const res = await fetch(`${API_BASE}/notifications`, { headers });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      return json.data;
+    }
+  } catch (err) {
+    console.warn('[API] Notifications fetch failed:', err);
+  }
+  return [];
+};
+
+export const markNotificationRead = async (id: string): Promise<void> => {
+  try {
+    const headers = await getHeaders();
+    await fetch(`${API_BASE}/notifications/${id}/read`, {
+      method: 'PUT',
+      headers,
+    });
+  } catch (err) {
+    console.warn('[API] Mark notification read failed:', err);
   }
 };
 
