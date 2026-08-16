@@ -36,7 +36,7 @@ export const sendOtpUser = async (email: string, password: string): Promise<{ su
     return data;
   } catch (err: any) {
     console.warn('[API] Send OTP error:', err);
-    return { success: false, message: 'Server connection error during OTP generation.' };
+    return { success: false, message: `Server connection error during OTP generation: ${err.message} (Target: ${API_BASE})` };
   }
 };
 
@@ -77,7 +77,7 @@ export const registerUser = async (userData: { name: string; email: string; pass
     return data;
   } catch (err: any) {
     console.warn('[API] Registration error:', err);
-    return { success: false, message: 'Server connection error during registration.' };
+    return { success: false, message: `Server connection error during registration: ${err.message} (Target: ${API_BASE})` };
   }
 };
 
