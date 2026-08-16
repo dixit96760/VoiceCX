@@ -96,3 +96,19 @@ export interface CallStats {
   inProgress: number;
   averageDuration: number;
 }
+
+export interface DoNotCall {
+  _id: string;
+  phoneNumber: string;
+  reason?: string;
+  addedAt?: string;
+}
+
+export interface AppNotification {
+  _id: string;
+  title: string;
+  message: string;
+  type: 'insight' | 'anomaly' | 'action';
+  read: boolean;
+  createdAt: string;
+}

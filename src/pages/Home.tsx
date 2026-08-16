@@ -58,7 +58,7 @@ export function Home() {
   if (loading || !data) {
     return (
       <div className="flex-1 flex flex-col">
-        <Header title="Home" showDateRange />
+        <Header title="Home" />
         <div className="flex-1 p-6 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary-500)]" />
         </div>
@@ -74,7 +74,7 @@ export function Home() {
 
   return (
     <div className="flex flex-col space-y-6">
-      <Header title="Good morning, Business Owner" description="Here's what's happening with your customer feedback today." showDateRange />
+      <Header title="Good morning, Business Owner" description="Here's what's happening with your customer feedback today." />
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <MetricCard title="Total Feedback" value={data.metrics.totalFeedback} icon={MessageSquare} trend={data.metrics.trends.totalFeedback} />
