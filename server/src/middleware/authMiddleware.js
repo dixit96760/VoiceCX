@@ -11,7 +11,7 @@ const protect = async (req, res, next) => {
 
   const isDb = getIsConnected();
 
-  if (!isDb || !token || token === 'demo_token_12345' || token === 'null' || token === 'undefined') {
+  if (!isDb || !token || token === 'null' || token === 'undefined') {
     return res.status(401).json({ success: false, message: 'Not authorized, no token provided' });
   }
 
