@@ -175,7 +175,198 @@ Output format strictly as JSON:
   };
 }
 
+/**
+ * Validate and sanitize Gemini analysis output to guarantee contract compliance
+ */
+function validateAndSanitizeAnalysis(parsed, text) {
+  const validSentiments = ['positive', 'negative', 'neutral'];
+  const validUrgencies = ['low', 'medium', 'high'];
+
+  let sentiment = typeof parsed?.sentiment === 'string' ? parsed.sentiment.toLowerCase().trim() : '';
+  if (!validSentiments.includes(sentiment)) {
+    sentiment = 'neutral';
+  }
+
+  let sentimentScore = typeof parsed?.sentimentScore === 'number' ? parsed.sentimentScore : parseFloat(parsed?.sentimentScore);
+  if (isNaN(sentimentScore)) {
+    sentimentScore = sentiment === 'positive' ? 0.85 : (sentiment === 'negative' ? 0.25 : 0.5);
+  }
+  // Clamp between 0.0 and 1.0
+  sentimentScore = Math.max(0.0, Math.min(1.0, Math.round(sentimentScore * 100) / 100));
+
+  let urgency = typeof parsed?.urgency === 'string' ? parsed.urgency.toLowerCase().trim() : '';
+  if (!validUrgencies.includes(urgency)) {
+    urgency = sentiment === 'negative' ? 'high' : (sentiment === 'neutral' ? 'medium' : 'low');
+  }
+
+  let category = typeof parsed?.category === 'string' && parsed.category.trim() ? parsed.category.trim().toLowerCase() : 'other';
+  let emotion = typeof parsed?.emotion === 'string' && parsed.emotion.trim() ? parsed.emotion.trim().toLowerCase() : 'neutral';
+  let summary = typeof parsed?.summary === 'string' && parsed.summary.trim() ? parsed.summary.trim() : (text ? text.slice(0, 150) : 'No summary available.');
+  
+  let topics = Array.isArray(parsed?.topics)
+    ? Array.from(new Set(parsed.topics.filter(t => typeof t === 'string' && t.trim()).map(t => t.trim().toLowerCase())))
+    : [];
+
+  if (topics.length === 0) {
+    topics = [category];
+  }
+
+  return {
+    sentiment,
+    sentimentScore,
+    category,
+    emotion,
+    urgency,
+    summary,
+    topics,
+  };
+}
+
+/**
+ * Smart algorithmic fallback analysis generator when Gemini API is unavailable or fails
+ */
+function generateFeedbackFallbackAnalysis(text) {
+  const lower = (text || '').toLowerCase();
+  
+  let sentiment = 'neutral';
+  let sentimentScore = 0.5;
+  let emotion = 'neutral';
+  let urgency = 'medium';
+  let category = 'other';
+  const topicsSet = new Set();
+
+  if (lower.includes('terrible') || lower.includes('worst') || lower.includes('horrible') || lower.includes('frustrated') || lower.includes('angry') || lower.includes('slow') || lower.includes('took too long') || lower.includes('cold') || lower.includes('rude') || lower.includes('bad') || lower.includes('disappointed')) {
+    sentiment = 'negative';
+    sentimentScore = 0.18;
+    urgency = 'high';
+    if (lower.includes('frustrated') || lower.includes('angry')) {
+      emotion = 'frustrated';
+    } else if (lower.includes('disappointed')) {
+      emotion = 'disappointed';
+    } else {
+      emotion = 'frustrated';
+    }
+  } else if (lower.includes('great') || lower.includes('loved') || lower.includes('delicious') || lower.includes('excellent') || lower.includes('amazing') || lower.includes('happy') || lower.includes('wonderful')) {
+    sentiment = 'positive';
+    sentimentScore = 0.92;
+    urgency = 'low';
+    emotion = lower.includes('happy') ? 'happy' : 'satisfied';
+  }
+
+  if (lower.includes('checkout') || lower.includes('pay') || lower.includes('register') || lower.includes('cashier') || lower.includes('bill')) {
+    category = 'checkout';
+    topicsSet.add('checkout');
+    topicsSet.add('performance');
+  } else if (lower.includes('service') || lower.includes('waiter') || lower.includes('staff') || lower.includes('server') || lower.includes('host')) {
+    category = 'service';
+    topicsSet.add('service');
+    topicsSet.add('staff');
+  } else if (lower.includes('food') || lower.includes('meal') || lower.includes('steak') || lower.includes('dish') || lower.includes('taste')) {
+    category = 'food';
+    topicsSet.add('food');
+    topicsSet.add('quality');
+  } else if (lower.includes('price') || lower.includes('cost') || lower.includes('expensive')) {
+    category = 'pricing';
+    topicsSet.add('pricing');
+  } else if (lower.includes('delivery') || lower.includes('driver')) {
+    category = 'delivery';
+    topicsSet.add('delivery');
+  } else {
+    category = 'other';
+    topicsSet.add('feedback');
+  }
+
+  if (lower.includes('slow') || lower.includes('took too long') || lower.includes('wait') || lower.includes('delay')) {
+    topicsSet.add('performance');
+  }
+
+  const summary = text && text.trim() ? text.trim() : 'Customer provided feedback.';
+
+  return {
+    sentiment,
+    sentimentScore,
+    category,
+    emotion,
+    urgency,
+    summary,
+    topics: Array.from(topicsSet),
+  };
+}
+
+/**
+ * Analyze customer feedback text using Google Gemini AI
+ * Returns structured analysis: { sentiment, sentimentScore, category, emotion, urgency, summary, topics }
+ */
+async function analyzeFeedbackText(feedbackInput) {
+  const text = typeof feedbackInput === 'string'
+    ? feedbackInput
+    : (feedbackInput?.text || feedbackInput?.summary || '');
+
+  if (!text || !text.trim()) {
+    throw new Error('Feedback text is required for analysis');
+  }
+
+  const cleanText = text.trim();
+  const ai = getAiClient();
+
+  if (ai) {
+    try {
+      const prompt = `
+You are an expert AI customer experience analyst.
+Analyze the following customer feedback text carefully:
+
+---
+${cleanText}
+---
+
+Extract structured analytical data and return strictly valid JSON matching this exact structure:
+{
+  "sentiment": "positive" | "negative" | "neutral",
+  "sentimentScore": number between 0.0 and 1.0 (where 0.0 is extremely negative/dissatisfied, 0.5 is neutral, and 1.0 is extremely positive/delighted),
+  "category": "short category string (e.g. checkout, service, food, pricing, staff, delivery, product, technical, other)",
+  "emotion": "short emotion string (e.g. happy, satisfied, frustrated, angry, disappointed, confused, neutral, excited)",
+  "urgency": "low" | "medium" | "high",
+  "summary": "short, concise 1-2 sentence summary of the customer feedback without inventing facts",
+  "topics": ["array of relevant unique topic strings"]
+}
+
+Rules:
+1. "sentiment" MUST be exactly one of: "positive", "negative", or "neutral".
+2. "sentimentScore" MUST be a floating point number strictly between 0.0 and 1.0 (e.g. 0.87). Do NOT use 0-100 scale.
+3. "category" MUST be a short meaningful category describing the main feedback issue.
+4. "emotion" MUST be a short emotion descriptor.
+5. "urgency" MUST be exactly one of: "low", "medium", or "high".
+6. "summary" MUST be a concise overview based only on the provided feedback text.
+7. "topics" MUST be an array of strings with no duplicates.
+8. Respond ONLY with valid raw JSON. Do NOT wrap in markdown backticks or add explanatory text outside JSON.
+`;
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Gemini API request timed out')), 10000)
+      );
+
+      const apiPromise = ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      const response = await Promise.race([apiPromise, timeoutPromise]);
+      const rawText = response.text || '';
+      const cleanJsonStr = rawText.replace(/```json\n?|\n?```/g, '').trim();
+      const parsed = JSON.parse(cleanJsonStr);
+
+      return validateAndSanitizeAnalysis(parsed, cleanText);
+    } catch (err) {
+      console.warn('[Gemini AI Feedback Analysis Warning]:', err.message);
+    }
+  }
+
+  return generateFeedbackFallbackAnalysis(cleanText);
+}
+
 module.exports = {
   generateVoiceScript,
   analyzeTranscript,
+  analyzeFeedbackText,
+  analyzeFeedback: analyzeFeedbackText,
 };

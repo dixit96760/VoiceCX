@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Feedback = require('../models/Feedback');
 const { getIsConnected } = require('../config/db');
 
@@ -60,6 +61,99 @@ let memoryFeedbacks = [
     date: new Date(Date.now() - 86400000 * 1),
   },
 ];
+
+// @desc    Create new feedback
+// @route   POST /api/feedback
+// @access  Private
+const createFeedback = async (req, res) => {
+  try {
+    const isDb = getIsConnected();
+    const userId = req.user._id;
+
+    const {
+      rating,
+      summary,
+      text,
+      transcript,
+      customerPhone,
+      phone,
+      customerName,
+      name,
+      customer,
+      customerId,
+      status,
+      sentiment,
+      categoryRatings,
+      ownerNotes,
+      notes,
+      topIssues,
+      complaints,
+      praises,
+      date,
+    } = req.body;
+
+    const numRating = Number(rating);
+    if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+      return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+    }
+
+    const textContent = (summary || text || (typeof transcript === 'string' ? transcript : (Array.isArray(transcript) && transcript.length > 0 ? JSON.stringify(transcript) : '')) || '').trim();
+    if (!textContent) {
+      return res.status(400).json({ success: false, message: 'Feedback text cannot be empty' });
+    }
+
+    const validSentiments = ['positive', 'neutral', 'negative'];
+    const resolvedSentiment = sentiment && validSentiments.includes(sentiment)
+      ? sentiment
+      : (numRating >= 4 ? 'positive' : numRating === 3 ? 'neutral' : 'negative');
+
+    const validStatuses = ['pending', 'reviewed', 'resolved', 'action_required'];
+    const resolvedStatus = status && validStatuses.includes(status) ? status : 'pending';
+
+    const targetCustomer = customer || customerId;
+    const finalCustomer = targetCustomer && mongoose.Types.ObjectId.isValid(targetCustomer) ? targetCustomer : undefined;
+
+    const feedbackData = {
+      user: userId,
+      customer: finalCustomer,
+      customerPhone: customerPhone || phone || '+1 (555) 000-0000',
+      customerName: customerName || name || 'Anonymous Guest',
+      rating: numRating,
+      sentiment: resolvedSentiment,
+      status: resolvedStatus,
+      summary: summary || textContent,
+      transcript: transcript || textContent,
+      categoryRatings: categoryRatings || { food: numRating, service: numRating, ambience: 4, value: 4 },
+      ownerNotes: ownerNotes !== undefined ? ownerNotes : (notes || ''),
+      topIssues: topIssues || complaints || [],
+      praises: praises || [],
+      date: date ? new Date(date) : new Date(),
+    };
+
+    if (!isDb) {
+      const newMemoryFb = {
+        _id: `fb_${Date.now()}`,
+        ...feedbackData,
+      };
+      memoryFeedbacks.unshift(newMemoryFb);
+      return res.status(201).json({
+        success: true,
+        message: 'Feedback created successfully',
+        data: newMemoryFb,
+      });
+    }
+
+    const feedback = await Feedback.create(feedbackData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Feedback created successfully',
+      data: feedback,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 // @desc    Get feedback list with query filters
 // @route   GET /api/feedback
@@ -134,13 +228,19 @@ const getFeedbackList = async (req, res) => {
 const getFeedbackById = async (req, res) => {
   try {
     const isDb = getIsConnected();
+    const { id } = req.params;
+
     if (!isDb) {
-      const fb = memoryFeedbacks.find(f => f._id === req.params.id || f.id === req.params.id);
+      const fb = memoryFeedbacks.find(f => f._id === id || f.id === id);
       if (!fb) return res.status(404).json({ success: false, message: 'Feedback entry not found' });
       return res.json({ success: true, data: fb });
     }
 
-    const feedback = await Feedback.findOne({ _id: req.params.id, user: req.user._id }).populate('customer');
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedback ID format' });
+    }
+
+    const feedback = await Feedback.findOne({ _id: id, user: req.user._id }).populate('customer');
 
     if (!feedback) {
       return res.status(404).json({ success: false, message: 'Feedback entry not found' });
@@ -149,6 +249,142 @@ const getFeedbackById = async (req, res) => {
     res.json({
       success: true,
       data: feedback,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update feedback entry
+// @route   PUT /api/feedback/:id
+// @access  Private
+const updateFeedback = async (req, res) => {
+  try {
+    const isDb = getIsConnected();
+    const { id } = req.params;
+
+    const {
+      rating,
+      summary,
+      text,
+      transcript,
+      customerPhone,
+      phone,
+      customerName,
+      name,
+      customer,
+      customerId,
+      status,
+      sentiment,
+      categoryRatings,
+      ownerNotes,
+      notes,
+      topIssues,
+      complaints,
+      praises,
+    } = req.body;
+
+    if (!isDb) {
+      const fb = memoryFeedbacks.find(f => f._id === id || f.id === id);
+      if (!fb) return res.status(404).json({ success: false, message: 'Feedback entry not found' });
+
+      if (rating !== undefined) fb.rating = Number(rating);
+      if (summary !== undefined || text !== undefined) fb.summary = summary || text;
+      if (transcript !== undefined) fb.transcript = transcript;
+      if (customerPhone !== undefined || phone !== undefined) fb.customerPhone = customerPhone || phone;
+      if (customerName !== undefined || name !== undefined) fb.customerName = customerName || name;
+      if (status && ['pending', 'reviewed', 'resolved', 'action_required'].includes(status)) fb.status = status;
+      if (sentiment && ['positive', 'neutral', 'negative'].includes(sentiment)) fb.sentiment = sentiment;
+      if (categoryRatings) fb.categoryRatings = { ...fb.categoryRatings, ...categoryRatings };
+      if (ownerNotes !== undefined || notes !== undefined) fb.ownerNotes = ownerNotes !== undefined ? ownerNotes : notes;
+      if (topIssues !== undefined || complaints !== undefined) fb.topIssues = topIssues || complaints;
+      if (praises !== undefined) fb.praises = praises;
+      if (customer || customerId) fb.customer = customer || customerId;
+
+      return res.json({
+        success: true,
+        message: 'Feedback updated successfully',
+        data: fb,
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedback ID format' });
+    }
+
+    const feedback = await Feedback.findOne({ _id: id, user: req.user._id });
+
+    if (!feedback) {
+      return res.status(404).json({ success: false, message: 'Feedback entry not found' });
+    }
+
+    if (rating !== undefined) feedback.rating = Number(rating);
+    if (summary !== undefined || text !== undefined) feedback.summary = summary || text;
+    if (transcript !== undefined) feedback.transcript = transcript;
+    if (customerPhone !== undefined || phone !== undefined) feedback.customerPhone = customerPhone || phone;
+    if (customerName !== undefined || name !== undefined) feedback.customerName = customerName || name;
+    if (status && ['pending', 'reviewed', 'resolved', 'action_required'].includes(status)) feedback.status = status;
+    if (sentiment && ['positive', 'neutral', 'negative'].includes(sentiment)) feedback.sentiment = sentiment;
+    if (categoryRatings) {
+      feedback.categoryRatings = {
+        food: categoryRatings.food !== undefined ? categoryRatings.food : feedback.categoryRatings.food,
+        service: categoryRatings.service !== undefined ? categoryRatings.service : feedback.categoryRatings.service,
+        ambience: categoryRatings.ambience !== undefined ? categoryRatings.ambience : feedback.categoryRatings.ambience,
+        value: categoryRatings.value !== undefined ? categoryRatings.value : feedback.categoryRatings.value,
+      };
+    }
+    if (ownerNotes !== undefined || notes !== undefined) {
+      feedback.ownerNotes = ownerNotes !== undefined ? ownerNotes : notes;
+    }
+    if (topIssues !== undefined || complaints !== undefined) feedback.topIssues = topIssues || complaints;
+    if (praises !== undefined) feedback.praises = praises;
+
+    const targetCustomer = customer || customerId;
+    if (targetCustomer && mongoose.Types.ObjectId.isValid(targetCustomer)) {
+      feedback.customer = targetCustomer;
+    }
+
+    await feedback.save();
+
+    res.json({
+      success: true,
+      message: 'Feedback updated successfully',
+      data: feedback,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete feedback entry
+// @route   DELETE /api/feedback/:id
+// @access  Private
+const deleteFeedback = async (req, res) => {
+  try {
+    const isDb = getIsConnected();
+    const { id } = req.params;
+
+    if (!isDb) {
+      const idx = memoryFeedbacks.findIndex(f => f._id === id || f.id === id);
+      if (idx === -1) return res.status(404).json({ success: false, message: 'Feedback entry not found' });
+      memoryFeedbacks.splice(idx, 1);
+      return res.json({ success: true, message: 'Feedback deleted successfully', id });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedback ID format' });
+    }
+
+    const feedback = await Feedback.findOneAndDelete({ _id: id, user: req.user._id });
+
+    if (!feedback) {
+      return res.status(404).json({ success: false, message: 'Feedback entry not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Feedback deleted successfully',
+      id,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -171,6 +407,10 @@ const updateNotes = async (req, res) => {
       return res.json({ success: true, message: 'Owner notes updated successfully', data: fb });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedback ID format' });
+    }
+
     const feedback = await Feedback.findOne({ _id: req.params.id, user: req.user._id });
 
     if (!feedback) {
@@ -181,7 +421,7 @@ const updateNotes = async (req, res) => {
     if (feedback.status === 'pending') {
       feedback.status = 'reviewed';
     }
-    
+
     await feedback.save();
 
     res.json({
@@ -195,7 +435,10 @@ const updateNotes = async (req, res) => {
 };
 
 module.exports = {
+  createFeedback,
   getFeedbackList,
   getFeedbackById,
+  updateFeedback,
+  deleteFeedback,
   updateNotes,
 };

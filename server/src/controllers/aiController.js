@@ -1,4 +1,84 @@
+const mongoose = require('mongoose');
 const { GoogleGenAI } = require('@google/genai');
+const Feedback = require('../models/Feedback');
+const { analyzeFeedbackText } = require('../services/geminiService');
+const { saveFeedbackAnalysis, getFeedbackAnalysisByFeedbackId } = require('../services/aiAnalysisService');
+const { getIsConnected } = require('../config/db');
+
+// @desc    Trigger AI analysis for specific feedback item and store result
+// @route   POST /api/ai/analyze/:feedbackId
+// @access  Private
+const analyzeFeedbackById = async (req, res) => {
+  try {
+    const { feedbackId } = req.params;
+    const isDb = getIsConnected();
+
+    if (isDb && !mongoose.Types.ObjectId.isValid(feedbackId)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedbackId format' });
+    }
+
+    let feedbackText = '';
+    let targetFeedback = null;
+
+    if (isDb) {
+      targetFeedback = await Feedback.findOne({ _id: feedbackId, user: req.user._id });
+      if (!targetFeedback) {
+        return res.status(404).json({ success: false, message: 'Feedback entry not found' });
+      }
+      feedbackText = targetFeedback.summary || targetFeedback.text || (typeof targetFeedback.transcript === 'string' ? targetFeedback.transcript : (Array.isArray(targetFeedback.transcript) ? JSON.stringify(targetFeedback.transcript) : ''));
+    } else {
+      feedbackText = 'Customer provided feedback.';
+    }
+
+    if (!feedbackText || !feedbackText.trim()) {
+      feedbackText = 'Customer provided dining feedback.';
+    }
+
+    // 1. Generate structured analysis using Gemini AI service
+    const analysisResult = await analyzeFeedbackText(feedbackText);
+
+    // 2. Persist analysis into MongoDB AIAnalysis collection via storage service
+    const savedAnalysis = await saveFeedbackAnalysis(feedbackId, analysisResult);
+
+    return res.status(200).json({
+      success: true,
+      message: 'AI feedback analysis completed and saved successfully',
+      data: savedAnalysis,
+    });
+  } catch (error) {
+    if (error.message && (error.message.includes('not found') || error.message.includes('Referenced feedback'))) {
+      return res.status(404).json({ success: false, message: 'Feedback entry not found' });
+    }
+    return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
+  }
+};
+
+// @desc    Get saved AI analysis for specific feedback item
+// @route   GET /api/ai/analysis/:feedbackId
+// @access  Private
+const getFeedbackAnalysis = async (req, res) => {
+  try {
+    const { feedbackId } = req.params;
+    const isDb = getIsConnected();
+
+    if (isDb && !mongoose.Types.ObjectId.isValid(feedbackId)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedbackId format' });
+    }
+
+    const analysisDoc = await getFeedbackAnalysisByFeedbackId(feedbackId);
+
+    if (!analysisDoc) {
+      return res.status(404).json({ success: false, message: 'AI analysis not found for this feedback entry' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: analysisDoc,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
+  }
+};
 
 // @desc    Analyze call transcript with Google Gemini AI
 // @route   POST /api/ai/analyze-transcript
@@ -120,4 +200,6 @@ function generateFallbackAnalysis(text) {
 
 module.exports = {
   analyzeTranscript,
+  analyzeFeedbackById,
+  getFeedbackAnalysis,
 };
