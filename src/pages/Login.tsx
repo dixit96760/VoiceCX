@@ -26,7 +26,7 @@ export function Login() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { login } = useAuth();
+  const { login, setUser } = useAuth();
   const navigate = useNavigate();
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -110,6 +110,7 @@ export function Login() {
       const res = await verifyOtpUser(email.trim(), otpCode);
       if (res.success && res.token) {
         setAuthToken(res.token);
+        if (res.user) setUser(res.user);
         navigate('/');
       } else {
         setError(res.message || 'Incorrect or expired OTP code.');
