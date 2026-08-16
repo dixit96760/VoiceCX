@@ -2,10 +2,10 @@ const mongoose = require('mongoose');
 
 const callSchema = new mongoose.Schema(
   {
-    ownerId: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: false,
+      required: true,
     },
     vapiCallId: {
       type: String,

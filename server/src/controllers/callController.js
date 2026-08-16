@@ -42,7 +42,7 @@ exports.createCall = async (req, res) => {
   try {
     const { contactName, phoneNumber, purpose, customInstructions } = req.body;
     const isDb = getIsConnected();
-    const ownerId = req.user ? req.user._id : undefined;
+    const userId = req.user ? req.user._id : undefined;
 
     if (!phoneNumber) {
       return res.status(400).json({ success: false, error: 'Phone number is required' });
@@ -63,7 +63,7 @@ exports.createCall = async (req, res) => {
     let callDoc = null;
     if (isDb) {
       callDoc = await Call.create({
-        ownerId,
+        user: userId,
         contactName: cleanName,
         phoneNumber: formattedPhone,
         purpose: cleanPurpose,
@@ -142,7 +142,7 @@ exports.getCalls = async (req, res) => {
     if (isDb) {
       const filter = {};
       if (req.user && req.user._id) {
-        filter.ownerId = req.user._id;
+        filter.user = req.user._id;
       }
 
       if (status && status !== 'all') {
@@ -252,7 +252,7 @@ exports.getDashboardStats = async (req, res) => {
     if (isDb) {
       const filter = {};
       if (req.user && req.user._id) {
-        filter.ownerId = req.user._id;
+        filter.user = req.user._id;
       }
 
       const calls = await Call.find(filter);
