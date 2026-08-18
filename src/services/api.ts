@@ -331,7 +331,7 @@ export const deleteCallRecord = async (id: string): Promise<boolean> => {
 export const getCallStats = async (): Promise<CallStats> => {
   try {
     const headers = await getHeaders();
-    const res = await fetch(`${API_BASE}/dashboard/stats`, { headers });
+    const res = await fetch(`${API_BASE}/calls/stats`, { headers });
     const json = await res.json();
 
     if (json.success && json.data) {
