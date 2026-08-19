@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Search, UserPlus } from 'lucide-react';
+import { Bell, Search, UserPlus, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getNotifications, markNotificationRead } from '../../services/api';
 import type { AppNotification } from '../../types';
@@ -15,6 +15,22 @@ export function Header({ title, description }: HeaderProps) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Theme state
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('voicecx_theme') === 'dark' || 
+      (!localStorage.getItem('voicecx_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('voicecx_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('voicecx_theme', 'light');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -65,11 +81,20 @@ export function Header({ title, description }: HeaderProps) {
           />
         </div>
 
+        {/* Theme Toggle */}
+        <button 
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-page)] rounded-full transition-colors"
+          title="Toggle Theme"
+        >
+          {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </button>
+
         {/* Notifications */}
         <div className="relative" ref={dropdownRef}>
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
-            className="relative p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] rounded-full transition-colors"
+            className="relative p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-page)] rounded-full transition-colors"
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
