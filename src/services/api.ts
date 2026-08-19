@@ -1,7 +1,10 @@
 import type { Feedback, Customer, DashboardMetrics, ChartDataPoint, RankedIssue, CallRecord, CallStats, DoNotCall, AppNotification } from '../types';
 
-const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const API_BASE = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl.replace(/\/$/, '')}/api`;
+let rawApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
+if (!rawApiUrl.startsWith('http')) {
+  rawApiUrl = `https://${rawApiUrl}`;
+}
+const API_BASE = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 let cachedToken: string | null = localStorage.getItem('voicecx_token');
 
