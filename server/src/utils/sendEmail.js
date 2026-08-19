@@ -1,5 +1,7 @@
 const nodemailer = require('nodemailer');
 
+let cachedTestAccount = null;
+
 /**
  * Sends a real 6-digit OTP email to the specified email address
  * @param {string} toEmail - Recipient email address
@@ -31,14 +33,16 @@ const sendOtpEmail = async (toEmail, otpCode) => {
       });
     } else {
       // Option 3: Auto-generated Ethereal SMTP test account for instant sandbox email testing
-      const testAccount = await nodemailer.createTestAccount();
+      if (!cachedTestAccount) {
+        cachedTestAccount = await nodemailer.createTestAccount();
+      }
       transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
         secure: false,
         auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
+          user: cachedTestAccount.user,
+          pass: cachedTestAccount.pass,
         },
       });
     }
