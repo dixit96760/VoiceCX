@@ -1,5 +1,4 @@
 const Call = require('../models/Call');
-const CustomerCallLog = require('../models/CustomerCallLog');
 const User = require('../models/User');
 const { getIsConnected } = require('../config/db');
 const { getVoiceProvider } = require('../services/voiceProvider');

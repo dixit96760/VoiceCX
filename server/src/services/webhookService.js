@@ -1,5 +1,4 @@
 const Call = require('../models/Call');
-const CustomerCallLog = require('../models/CustomerCallLog');
 const { getIsConnected } = require('../config/db');
 const { getVoiceProvider } = require('./voiceProvider');
 const { generateCallSummary } = require('./aiSummaryService');
@@ -113,25 +112,7 @@ async function processVapiWebhook(payload, headers) {
 
         await callDoc.save();
 
-        // Also create/sync entry in CustomerCallLog for full backwards compatibility
-        try {
-          await CustomerCallLog.create({
-            ownerId: callDoc.ownerId,
-            customerName: callDoc.contactName,
-            customerPhone: callDoc.phoneNumber,
-            callStatus: 'completed',
-            durationSeconds: callDoc.duration || 45,
-            rawTranscript: typeof callDoc.transcript === 'string' ? callDoc.transcript : JSON.stringify(callDoc.transcript),
-            sentimentScore: summaryResult.sentiment === 'positive' ? 85 : (summaryResult.sentiment === 'negative' ? 30 : 60),
-            sentimentLabel: summaryResult.sentiment,
-            feedbackCategory: 'General',
-            summary: summaryResult.summary,
-            actionItems: summaryResult.nextAction ? [summaryResult.nextAction] : [],
-            resolved: false,
-          });
-        } catch (err) {
-          console.warn('[webhookService] CustomerCallLog sync notice:', err.message);
-        }
+
       }
 
       return { success: true, callId: callDoc._id, status: callDoc.status };
