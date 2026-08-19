@@ -357,7 +357,7 @@ exports.handleTwilioVoiceWebhook = async (req, res) => {
     res.set('Content-Type', 'text/xml');
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna-Neural" language="en-US">Hello! Thank you for picking up. We will call you back shortly. Goodbye!</Say>
+  <Say voice="alice" language="en-US">Hello! Thank you for picking up. We will call you back shortly. Goodbye!</Say>
   <Hangup/>
 </Response>`);
   }
@@ -423,7 +423,7 @@ exports.handleTwilioGatherWebhook = async (req, res) => {
     res.set('Content-Type', 'text/xml');
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna-Neural" language="en-US">Thank you for your time. Have a great day. Goodbye!</Say>
+  <Say voice="alice" language="en-US">Thank you for your time. Have a great day. Goodbye!</Say>
   <Hangup/>
 </Response>`);
   }
