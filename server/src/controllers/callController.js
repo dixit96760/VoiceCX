@@ -321,7 +321,7 @@ exports.handleTwilioVoiceWebhook = async (req, res) => {
     const callSid = req.body.CallSid || '';
     const to = req.body.To || '';
     const isDb = getIsConnected();
-    const baseUrl = (process.env.PUBLIC_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
+    const baseUrl = process.env.PUBLIC_BASE_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
 
     // Find the call record to get contact name, purpose, instructions
     let contactName = 'there';
@@ -374,7 +374,7 @@ exports.handleTwilioGatherWebhook = async (req, res) => {
     const customInstructions = req.query.customInstructions || '';
     const turn = parseInt(req.query.turn || '1', 10);
     const historyEncoded = req.query.history || '';
-    const baseUrl = (process.env.PUBLIC_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
+    const baseUrl = process.env.PUBLIC_BASE_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
     const isDb = getIsConnected();
 
     console.log(`[GatherWebhook] Turn ${turn} | CallSid: ${callSid} | Speech: "${callerSpeech}"`);
