@@ -22,10 +22,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Telephony Webhooks Endpoints
 app.post('/api/webhooks/vapi', handleVapiWebhook);
-app.post('/api/webhooks/twilio/status', handleTwilioStatusWebhook);
-app.post('/api/webhooks/twilio/voice', handleTwilioVoiceWebhook);
-app.post('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
-app.get('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
+app.all('/api/webhooks/twilio/status', handleTwilioStatusWebhook);
+app.all('/api/webhooks/twilio/voice', handleTwilioVoiceWebhook);
+app.all('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
 
 // Dedicated basic endpoint for Twilio incoming calls
 app.post('/voice', (req, res) => {

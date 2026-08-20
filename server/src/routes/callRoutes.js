@@ -13,10 +13,9 @@ router.delete('/:id', protect, callController.deleteCall);
 // Telephony Webhooks Endpoints
 router.post('/webhooks/vapi', callController.handleVapiWebhook);
 router.post('/vapi/webhook', callController.handleVapiWebhook);
-router.post('/webhooks/twilio/status', callController.handleTwilioStatusWebhook);
-router.post('/webhooks/twilio/voice', callController.handleTwilioVoiceWebhook);
-router.post('/webhooks/twilio/gather', callController.handleTwilioGatherWebhook);
-router.get('/webhooks/twilio/gather', callController.handleTwilioGatherWebhook);
+router.all('/webhooks/twilio/status', callController.handleTwilioStatusWebhook);
+router.all('/webhooks/twilio/voice', callController.handleTwilioVoiceWebhook);
+router.all('/webhooks/twilio/gather', callController.handleTwilioGatherWebhook);
 
 // Legacy routes compatibility
 router.get('/analytics', protect, callController.getDashboardStats);

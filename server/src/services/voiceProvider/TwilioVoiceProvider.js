@@ -34,8 +34,15 @@ class TwilioVoiceProvider extends VoiceProvider {
       );
     }
 
-    const callbackUrl = `${this.appUrl}/api/webhooks/twilio/voice`;
-    const statusCallbackUrl = `${this.appUrl}/api/webhooks/twilio/status`;
+    let callbackUrl = `${this.appUrl}/api/webhooks/twilio/voice`;
+    let statusCallbackUrl = `${this.appUrl}/api/webhooks/twilio/status`;
+
+    // Twilio converts POST to GET on 301 redirects. If the user set PUBLIC_BASE_URL to http:// on Render,
+    // Twilio gets redirected, hits GET, and gets 404. Force HTTPS to avoid the redirect entirely.
+    if (!callbackUrl.includes('localhost') && callbackUrl.startsWith('http://')) {
+      callbackUrl = callbackUrl.replace('http://', 'https://');
+      statusCallbackUrl = statusCallbackUrl.replace('http://', 'https://');
+    }
 
     const call = await this.client.calls.create({
       to: phoneNumber,
