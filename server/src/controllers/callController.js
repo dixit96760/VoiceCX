@@ -321,7 +321,10 @@ exports.handleTwilioVoiceWebhook = async (req, res) => {
     const callSid = req.body.CallSid || '';
     const to = req.body.To || '';
     const isDb = getIsConnected();
-    const baseUrl = process.env.PUBLIC_BASE_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
+    const host = req.get('host') || 'voicecx.onrender.com';
+    const isLocal = host.includes('localhost') || host.includes('ngrok');
+    const proto = isLocal ? 'http' : 'https';
+    const baseUrl = process.env.PUBLIC_BASE_URL || `${proto}://${host}`;
 
     // Find the call record to get contact name, purpose, instructions
     let contactName = 'there';
@@ -374,7 +377,10 @@ exports.handleTwilioGatherWebhook = async (req, res) => {
     const customInstructions = req.query.customInstructions || '';
     const turn = parseInt(req.query.turn || '1', 10);
     const historyEncoded = req.query.history || '';
-    const baseUrl = process.env.PUBLIC_BASE_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
+    const host = req.get('host') || 'voicecx.onrender.com';
+    const isLocal = host.includes('localhost') || host.includes('ngrok');
+    const proto = isLocal ? 'http' : 'https';
+    const baseUrl = process.env.PUBLIC_BASE_URL || `${proto}://${host}`;
     const isDb = getIsConnected();
 
     console.log(`[GatherWebhook] Turn ${turn} | CallSid: ${callSid} | Speech: "${callerSpeech}"`);

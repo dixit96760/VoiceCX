@@ -55,7 +55,7 @@ async function buildGreetingTwiML(callSid, contactName, purpose, customInstructi
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather action="${gatherUrl}?${params.toString().replace(/&/g, '&amp;')}" input="speech" timeout="6" speechTimeout="auto" language="en-IN">
+  <Gather action="${gatherUrl}?${params.toString().replace(/&/g, '&amp;')}" input="speech" timeout="6" speechTimeout="auto" language="en-US">
     <Say voice="alice" language="en-US">${escapeXml(greeting)}</Say>
   </Gather>
   <Say voice="alice" language="en-US">I didn't catch that. Are you there?</Say>
@@ -168,7 +168,7 @@ async function buildReplyTwiML(callerSpeech, callSid, contactName, purpose, cust
   return {
     twiml: `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather action="${gatherUrl}?${params.toString().replace(/&/g, '&amp;')}" input="speech" timeout="6" speechTimeout="auto" language="en-IN">
+  <Gather action="${gatherUrl}?${params.toString().replace(/&/g, '&amp;')}" input="speech" timeout="6" speechTimeout="auto" language="en-US">
     <Say voice="alice" language="en-US">${escapeXml(aiReply)}</Say>
   </Gather>
   <Say voice="alice" language="en-US">Are you still there?</Say>
