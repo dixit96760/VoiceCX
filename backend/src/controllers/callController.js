@@ -1,7 +1,7 @@
 const Call = require('../models/Call');
 const User = require('../models/User');
 const { getIsConnected } = require('../config/db');
-const { processVapiWebhook } = require('../services/webhookService');
+
 const { analyzeTranscript } = require('../services/geminiService');
 const { generateCallSummary } = require('../services/aiSummaryService');
 
@@ -78,6 +78,36 @@ exports.createCall = async (req, res) => {
         status: 'queued',
         createdAt: new Date(),
       };
+    }
+
+    // Trigger Make.com Automation if Webhook URL is provided
+    const makeWebhookUrl = process.env.MAKE_WEBHOOK_URL;
+    if (makeWebhookUrl) {
+      try {
+        const makePayload = {
+          callId: callDoc._id,
+          contactName: cleanName,
+          phoneNumber: formattedPhone,
+          purpose: cleanPurpose,
+          customInstructions: cleanInstructions
+        };
+        // Node 18+ has native fetch
+        await fetch(makeWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(makePayload)
+        });
+        console.log(`[Make.com] Triggered outbound call automation for ${formattedPhone}`);
+        
+        if (isDb) {
+          callDoc.status = 'calling';
+          await callDoc.save();
+        } else {
+          callDoc.status = 'calling';
+        }
+      } catch (err) {
+        console.error('[Make.com Webhook Error] Failed to ping Make.com:', err.message);
+      }
     }
 
     // Return call record response
@@ -254,99 +284,45 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
-// @desc    6. Webhook Endpoint Handlers (Vapi & Twilio)
-// @route   POST /api/webhooks/vapi or POST /api/webhooks/twilio/status
-exports.handleVapiWebhook = async (req, res) => {
+// @desc    6. Webhook Endpoint Handlers (Make.com Automation)
+// @route   POST /api/webhooks/make-feedback
+// Make.com will POST to this URL when the call completes.
+// Expected payload: { callId, transcript, summary, sentiment, outcome, duration }
+exports.handleMakeFeedbackWebhook = async (req, res) => {
   try {
-    const result = await processVapiWebhook(req.body, req.headers);
-    return res.json(result);
-  } catch (error) {
-    console.error('[handleVapiWebhook Error]', error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-exports.handleTwilioStatusWebhook = async (req, res) => {
-  try {
-    const result = await processVapiWebhook(req.body, req.headers);
-    return res.json(result);
-  } catch (error) {
-    console.error('[handleTwilioStatusWebhook Error]', error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// @desc  Voice Webhook — Twilio calls this when recipient picks up
-// @route POST /api/webhooks/twilio/voice
-exports.handleTwilioVoiceWebhook = async (req, res) => {
-  try {
-    const callSid = req.body.CallSid || '';
-    const to = req.body.To || '';
+    const { callId, transcript, summary, sentiment, outcome, duration } = req.body;
     const isDb = getIsConnected();
-    const host = req.get('host') || 'voicecx.onrender.com';
-    const isLocal = host.includes('localhost') || host.includes('ngrok');
-    const proto = isLocal ? 'http' : 'https';
-    const baseUrl = process.env.PUBLIC_BASE_URL || `${proto}://${host}`;
 
-    // Find the call record to get contact name, purpose, instructions
-    let contactName = 'there';
-    let purpose = 'follow up';
-    let customInstructions = '';
+    if (!callId) {
+      return res.status(400).json({ success: false, error: 'Missing callId in Make.com payload' });
+    }
 
-    if (isDb && callSid) {
-      const callDoc = await Call.findOne({
-        $or: [{ twilioCallSid: callSid }, { phoneNumber: to }],
-      }).sort({ createdAt: -1 });
+    console.log(`[Make.com Webhook] Received call feedback for Call ID: ${callId}`);
 
+    if (isDb) {
+      const callDoc = await Call.findById(callId) || await Call.findOne({ vapiCallId: callId });
+      
       if (callDoc) {
-        contactName = callDoc.contactName || 'there';
-        purpose = callDoc.purpose || 'follow up';
-        customInstructions = callDoc.customInstructions || '';
-        // Mark as in-progress
-        callDoc.status = 'in-progress';
-        callDoc.startedAt = callDoc.startedAt || new Date();
-        callDoc.twilioCallSid = callSid;
+        callDoc.status = 'completed';
+        callDoc.endedAt = new Date();
+        if (transcript) callDoc.transcript = transcript;
+        if (summary) callDoc.summary = summary;
+        if (sentiment) callDoc.sentiment = sentiment.toLowerCase();
+        if (outcome) callDoc.outcome = outcome;
+        if (duration) callDoc.duration = Number(duration);
+        
         await callDoc.save();
+        console.log(`[Make.com Webhook] Successfully updated Call ID: ${callId}`);
+      } else {
+        console.warn(`[Make.com Webhook] Call ID ${callId} not found in database.`);
       }
     }
 
-    console.log(`[VoiceWebhook] Call ${callSid} answered by ${to} — Contact: ${contactName}, Purpose: ${purpose}`);
-
-    res.set('Content-Type', 'text/xml');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">Thank you for calling. Goodbye!</Say>
-  <Hangup/>
-</Response>`);
+    // Always respond 200 so Make.com knows it succeeded
+    return res.json({ success: true, message: 'Feedback ingested successfully' });
   } catch (error) {
-    console.error('[handleTwilioVoiceWebhook Error]', error);
-    res.set('Content-Type', 'text/xml');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">Hello! Thank you for picking up. Goodbye!</Say>
-  <Hangup/>
-</Response>`);
-  }
-};
-
-// @desc  Gather Webhook — Processes speech input
-// @route POST /api/webhooks/twilio/gather
-exports.handleTwilioGatherWebhook = async (req, res) => {
-  try {
-    res.set('Content-Type', 'text/xml');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">Thank you for your response. Have a great day. Goodbye!</Say>
-  <Hangup/>
-</Response>`);
-  } catch (error) {
-    console.error('[handleTwilioGatherWebhook Error]', error);
-    res.set('Content-Type', 'text/xml');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">Thank you for your time. Goodbye!</Say>
-  <Hangup/>
-</Response>`);
+    console.error('[handleMakeFeedbackWebhook Error]', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

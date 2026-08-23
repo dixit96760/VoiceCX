@@ -8,7 +8,7 @@ dotenv.config();
 
 const { connectDB } = require('./config/db');
 const { demoMode, twilioConfigured, geminiConfigured } = require('./config/appConfig');
-const { handleVapiWebhook, handleTwilioStatusWebhook, handleTwilioVoiceWebhook, handleTwilioGatherWebhook } = require('./controllers/callController');
+const { handleMakeFeedbackWebhook } = require('./controllers/callController');
 
 const app = express();
 
@@ -20,22 +20,8 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Telephony Webhooks Endpoints
-app.post('/api/webhooks/vapi', handleVapiWebhook);
-app.all('/api/webhooks/twilio/status', handleTwilioStatusWebhook);
-app.all('/api/webhooks/twilio/voice', handleTwilioVoiceWebhook);
-app.all('/api/webhooks/twilio/gather', handleTwilioGatherWebhook);
-
-// Dedicated basic endpoint for Twilio incoming calls
-app.post('/voice', (req, res) => {
-  res.set('Content-Type', 'text/xml');
-  res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say>
-        Hello, your call is connected successfully.
-    </Say>
-</Response>`);
-});
+// Automation Webhook Endpoints
+app.post('/api/webhooks/make-feedback', handleMakeFeedbackWebhook);
 
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));

@@ -10,18 +10,13 @@ router.get('/stats', protect, callController.getDashboardStats);
 router.get('/:id', protect, callController.getCallById);
 router.delete('/:id', protect, callController.deleteCall);
 
-// Telephony Webhooks Endpoints
-router.post('/webhooks/vapi', callController.handleVapiWebhook);
-router.post('/vapi/webhook', callController.handleVapiWebhook);
-router.all('/webhooks/twilio/status', callController.handleTwilioStatusWebhook);
-router.all('/webhooks/twilio/voice', callController.handleTwilioVoiceWebhook);
-router.all('/webhooks/twilio/gather', callController.handleTwilioGatherWebhook);
+// Automation Webhook Endpoints
+router.post('/webhooks/make-feedback', callController.handleMakeFeedbackWebhook);
 
 // Legacy routes compatibility
 router.get('/analytics', protect, callController.getDashboardStats);
 router.post('/simulate', protect, callController.simulateCall);
 router.put('/:id/resolve', protect, callController.toggleResolveActionItem);
-router.post('/twilio/webhook', callController.handleVapiWebhook);
 router.post('/twilio/call', protect, callController.createCall);
 
 module.exports = router;
