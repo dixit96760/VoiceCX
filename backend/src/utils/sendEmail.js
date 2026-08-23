@@ -34,6 +34,7 @@ const sendOtpEmail = async (toEmail, otpCode) => {
     } else {
       // Option 3: Auto-generated Ethereal SMTP test account for instant sandbox email testing
       if (!cachedTestAccount) {
+        console.log('[Email Service] Creating new Ethereal test account... (This takes a few seconds)');
         cachedTestAccount = await nodemailer.createTestAccount();
       }
       transporter = nodemailer.createTransport({

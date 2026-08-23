@@ -98,7 +98,8 @@ const sendOtp = async (req, res) => {
         ? `A 6-digit verification code was sent to your phone via SMS` 
         : `A 6-digit verification code was sent to ${cleanEmail}`,
       otpRequired: true,
-      deliveryMethod: method
+      deliveryMethod: method,
+      previewUrl
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -340,7 +341,8 @@ const forgotPassword = async (req, res) => {
         ? `A 6-digit reset code was sent to your phone via SMS`
         : `A 6-digit reset code was sent to ${cleanEmail}`,
       otpRequired: true,
-      deliveryMethod: method
+      deliveryMethod: method,
+      previewUrl
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

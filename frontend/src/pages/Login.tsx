@@ -362,6 +362,14 @@ export function Login() {
                   <>We sent a 6-digit code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.</>
                 )}
               </p>
+              {previewUrl && (
+                <div className="mt-2 pt-2 border-t border-indigo-200">
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-md font-semibold text-xs hover:bg-indigo-700 transition-colors">
+                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                    Open Sandbox Test Inbox to view OTP
+                  </a>
+                </div>
+              )}
             </div>
 
             {error && (
@@ -479,6 +487,14 @@ export function Login() {
                   <>We sent a 6-digit reset code to <span className="font-semibold underline">{email}</span>. Please check your email inbox.</>
                 )}
               </p>
+              {previewUrl && (
+                <div className="mt-2 pt-2 border-t border-indigo-200">
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-md font-semibold text-xs hover:bg-indigo-700 transition-colors">
+                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                    Open Sandbox Test Inbox to view OTP
+                  </a>
+                </div>
+              )}
             </div>
 
             {error && (
