@@ -35,56 +35,7 @@ async function callGemini(client, prompt) {
   return response.text;
 }
 
-/**
- * Generate Voice Agent Script from restaurant menu & tone
- */
-async function generateVoiceScript({ restaurantName, cuisineType, voiceAgentTone, menuItems }) {
-  const ai = getAiClient();
-  const menuSummary = (menuItems || [])
-    .map((item) => `- ${item.name} ($${item.price}): ${item.description || ''}`)
-    .join('\n');
 
-  const prompt = `
-You are an expert conversational AI designer for restaurant voice agents.
-Create a warm, engaging, and professional voice agent script for automated customer follow-up calls after dining at "${restaurantName}" (${cuisineType} cuisine).
-
-Tone: ${voiceAgentTone || 'Friendly & Warm'}
-Featured Menu Items:
-${menuSummary || '- Signature Dishes and Chef Specials'}
-
-Please output a structured JSON object with the following fields:
-{
-  "greeting": "Opening greeting line asking about their recent visit",
-  "keyQuestions": ["Array of 3 natural customer feedback questions covering food, service, and ambiance"],
-  "specialOfferOffer": "A polite offer for their next visit or dessert incentive",
-  "fullScript": "The full conversational voice script flow written out for the AI voice agent"
-}
-Only output valid raw JSON without markdown codeblock formatting if possible.
-`;
-
-  if (ai) {
-    try {
-      const text = await callGemini(ai, prompt);
-      const cleanJson = text.replace(/```json\n?|\n?```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      return parsed;
-    } catch (err) {
-      console.warn('[Gemini API Fallback Script Generation]:', err.message);
-    }
-  }
-
-  // Fallback realistic response if API key is not configured or fails
-  return {
-    greeting: `Hi! This is Alex calling from ${restaurantName}. We hope you had a fantastic meal with us today!`,
-    keyQuestions: [
-      `How did you enjoy our featured items like ${menuItems?.[0]?.name || 'our signature dishes'}?`,
-      `How was the service provided by your host and server?`,
-      `Is there anything we can improve regarding the speed, presentation, or ambiance?`
-    ],
-    specialOfferOffer: `We'd love to gift you 15% off your next visit or a complimentary dessert!`,
-    fullScript: `[AGENT]: Hello! I am calling from ${restaurantName} to see how your visit went today.\n[CUSTOMER]: (Responds with feedback)\n[AGENT]: Thank you so much! We appreciate your thoughts on our ${cuisineType || 'food'} and team service. Have a wonderful rest of your day!`
-  };
-}
 
 /**
  * Analyze raw text transcript of customer phone feedback
@@ -163,8 +114,8 @@ Output format strictly as JSON:
   const sampleActionItems = sentimentLabel === 'negative'
     ? ['Issue customer follow-up apology & voucher', 'Conduct staff briefing on service speed', 'Verify food temperature before dispatch']
     : sentimentLabel === 'neutral'
-    ? ['Gather additional feedback on side dishes', 'Ensure drink orders arrive promptly']
-    : ['Share positive feedback with kitchen team', 'Offer loyalty reward bonus for next visit'];
+      ? ['Gather additional feedback on side dishes', 'Ensure drink orders arrive promptly']
+      : ['Share positive feedback with kitchen team', 'Offer loyalty reward bonus for next visit'];
 
   return {
     sentimentScore,
@@ -202,7 +153,7 @@ function validateAndSanitizeAnalysis(parsed, text) {
   let category = typeof parsed?.category === 'string' && parsed.category.trim() ? parsed.category.trim().toLowerCase() : 'other';
   let emotion = typeof parsed?.emotion === 'string' && parsed.emotion.trim() ? parsed.emotion.trim().toLowerCase() : 'neutral';
   let summary = typeof parsed?.summary === 'string' && parsed.summary.trim() ? parsed.summary.trim() : (text ? text.slice(0, 150) : 'No summary available.');
-  
+
   let topics = Array.isArray(parsed?.topics)
     ? Array.from(new Set(parsed.topics.filter(t => typeof t === 'string' && t.trim()).map(t => t.trim().toLowerCase())))
     : [];
@@ -227,7 +178,7 @@ function validateAndSanitizeAnalysis(parsed, text) {
  */
 function generateFeedbackFallbackAnalysis(text) {
   const lower = (text || '').toLowerCase();
-  
+
   let sentiment = 'neutral';
   let sentimentScore = 0.5;
   let emotion = 'neutral';
@@ -365,7 +316,6 @@ Rules:
 }
 
 module.exports = {
-  generateVoiceScript,
   analyzeTranscript,
   analyzeFeedbackText,
   analyzeFeedback: analyzeFeedbackText,

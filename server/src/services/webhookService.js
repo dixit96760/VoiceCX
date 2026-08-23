@@ -1,23 +1,19 @@
-const Call = require('../models/Call');
-const { getIsConnected } = require('../config/db');
-const { getVoiceProvider } = require('./voiceProvider');
-const { generateCallSummary } = require('./aiSummaryService');
-
-// In-memory set for tracking processed webhook events (idempotency fallback)
-const processedEvents = new Set();
-const processedCompletedCalls = new Set();
 
 /**
- * Idempotent Webhook Processor for Vapi / Telephony Provider events
+ * Idempotent Webhook Processor for Telephony Provider events
  * @param {Object} payload - Raw webhook request body
  * @param {Object} [headers] - Request headers for signature validation
  */
 async function processVapiWebhook(payload, headers) {
   try {
-    const voiceProvider = getVoiceProvider();
-    const parsed = await voiceProvider.handleWebhook(payload, headers);
-
-    const { vapiCallId, status, transcript, recordingUrl, duration, eventType } = parsed;
+    const message = payload.message || payload;
+    const call = message.call || {};
+    const vapiCallId = call.id || payload.vapiCallId || payload.CallSid || payload.call_id;
+    const status = message.status || payload.status || (payload.CallStatus ? (payload.CallStatus === 'completed' ? 'completed' : 'in-progress') : 'completed');
+    const transcript = message.transcript || payload.transcript || [];
+    const recordingUrl = message.artifact?.stereoRecordingUrl || payload.recordingUrl || payload.RecordingUrl;
+    const duration = message.durationSeconds || payload.duration;
+    const eventType = message.type || payload.eventType || 'call-update';
 
     if (!vapiCallId) {
       console.warn('[webhookService] Received webhook payload without vapiCallId:', payload);
